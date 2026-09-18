@@ -87,32 +87,37 @@ export function PlayerSessionRow({
                   {ps.done_for_session ? "Done" : "Mark done"}
                 </button>
 
-                {ps.done_for_session &&
-                  (ps.payment_method ? (
-                    <button
-                      type="button"
-                      disabled={payPending}
-                      title={`Paid — ${
-                        ps.payment_method === "Cash" ? "Cash" : "GCash"
-                      } (click to mark as unpaid)`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        startPayTransition(() => unmarkPaid(ps.id));
-                      }}
-                      className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors disabled:opacity-50 ${
-                        ps.payment_method === "Cash"
-                          ? "bg-green-100 text-green-700 hover:bg-green-200"
-                          : "bg-blue-100 text-blue-700 hover:bg-blue-200"
-                      }`}
-                    >
-                      {ps.payment_method === "Cash" ? (
-                        <IconPeso className="h-3 w-3" />
-                      ) : (
-                        <IconPhone className="h-3 w-3" />
-                      )}
-                      {ps.payment_method === "Cash" ? "Cash" : "GCash"}
-                    </button>
-                  ) : (
+                {ps.payment_method ? (
+                  // Shown whenever paid, regardless of the done-for-session
+                  // toggle — the two aren't linked, so a paid player can end
+                  // up not "done" (e.g. toggled back to active for another
+                  // round), and payment status shouldn't disappear when that
+                  // happens.
+                  <button
+                    type="button"
+                    disabled={payPending}
+                    title={`Paid — ${
+                      ps.payment_method === "Cash" ? "Cash" : "GCash"
+                    } (click to mark as unpaid)`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      startPayTransition(() => unmarkPaid(ps.id));
+                    }}
+                    className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors disabled:opacity-50 ${
+                      ps.payment_method === "Cash"
+                        ? "bg-green-100 text-green-700 hover:bg-green-200"
+                        : "bg-blue-100 text-blue-700 hover:bg-blue-200"
+                    }`}
+                  >
+                    {ps.payment_method === "Cash" ? (
+                      <IconPeso className="h-3 w-3" />
+                    ) : (
+                      <IconPhone className="h-3 w-3" />
+                    )}
+                    {ps.payment_method === "Cash" ? "Cash" : "GCash"}
+                  </button>
+                ) : (
+                  ps.done_for_session && (
                     <>
                       <button
                         disabled={payPending}
@@ -137,7 +142,8 @@ export function PlayerSessionRow({
                         <IconPhone className="h-3.5 w-3.5" />
                       </button>
                     </>
-                  ))}
+                  )
+                )}
 
                 {confirmingDelete ? (
                   <div className="flex items-center gap-1">
@@ -218,48 +224,48 @@ export function PlayerSessionRow({
                   {ps.done_for_session ? "Done" : "Mark done"}
                 </button>
               </div>
-              {ps.done_for_session ? (
-                ps.payment_method ? (
+              {ps.payment_method ? (
+                // Shown whenever paid, regardless of the done-for-session
+                // toggle — see the same note in the compact row above.
+                <button
+                  type="button"
+                  disabled={payPending}
+                  title="Click to mark as unpaid"
+                  onClick={() => startPayTransition(() => unmarkPaid(ps.id))}
+                  className={`flex w-fit items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
+                    ps.payment_method === "Cash"
+                      ? "bg-green-100 text-green-700 hover:bg-green-200"
+                      : "bg-blue-100 text-blue-700 hover:bg-blue-200"
+                  }`}
+                >
+                  {ps.payment_method === "Cash" ? (
+                    <IconPeso className="h-3.5 w-3.5" />
+                  ) : (
+                    <IconPhone className="h-3.5 w-3.5" />
+                  )}
+                  Paid — {ps.payment_method === "Cash" ? "Cash" : "GCash"}
+                </button>
+              ) : ps.done_for_session ? (
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
                     disabled={payPending}
-                    title="Click to mark as unpaid"
-                    onClick={() => startPayTransition(() => unmarkPaid(ps.id))}
-                    className={`flex w-fit items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
-                      ps.payment_method === "Cash"
-                        ? "bg-green-100 text-green-700 hover:bg-green-200"
-                        : "bg-blue-100 text-blue-700 hover:bg-blue-200"
-                    }`}
+                    onClick={() => startPayTransition(() => markPaid(ps.id, "Cash"))}
+                    className="flex items-center gap-1.5 rounded-full bg-green-100 px-3 py-1.5 text-xs font-medium text-green-700 transition-colors hover:bg-green-200 disabled:opacity-50"
                   >
-                    {ps.payment_method === "Cash" ? (
-                      <IconPeso className="h-3.5 w-3.5" />
-                    ) : (
-                      <IconPhone className="h-3.5 w-3.5" />
-                    )}
-                    Paid — {ps.payment_method === "Cash" ? "Cash" : "GCash"}
+                    <IconPeso className="h-3.5 w-3.5" />
+                    Mark paid — Cash
                   </button>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      disabled={payPending}
-                      onClick={() => startPayTransition(() => markPaid(ps.id, "Cash"))}
-                      className="flex items-center gap-1.5 rounded-full bg-green-100 px-3 py-1.5 text-xs font-medium text-green-700 transition-colors hover:bg-green-200 disabled:opacity-50"
-                    >
-                      <IconPeso className="h-3.5 w-3.5" />
-                      Mark paid — Cash
-                    </button>
-                    <button
-                      type="button"
-                      disabled={payPending}
-                      onClick={() => startPayTransition(() => markPaid(ps.id, "Gcash"))}
-                      className="flex items-center gap-1.5 rounded-full bg-blue-100 px-3 py-1.5 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-200 disabled:opacity-50"
-                    >
-                      <IconPhone className="h-3.5 w-3.5" />
-                      Mark paid — GCash
-                    </button>
-                  </div>
-                )
+                  <button
+                    type="button"
+                    disabled={payPending}
+                    onClick={() => startPayTransition(() => markPaid(ps.id, "Gcash"))}
+                    className="flex items-center gap-1.5 rounded-full bg-blue-100 px-3 py-1.5 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-200 disabled:opacity-50"
+                  >
+                    <IconPhone className="h-3.5 w-3.5" />
+                    Mark paid — GCash
+                  </button>
+                </div>
               ) : (
                 <p className="text-sm text-black/40">
                   Mark this player done for the session to record payment.
