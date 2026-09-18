@@ -21,16 +21,26 @@ async function recomputePlayerGameCounts(
   supabase: Awaited<ReturnType<typeof createClient>>,
   sessionId: string
 ) {
-  const [{ data: games, error: gamesError }, { data: session, error: sessionError }] = await Promise.all([
+  // These three reads don't depend on each other, so fire them together
+  // instead of one after another — halves the network round-trips this
+  // function needs (it's called after every game create/edit/delete/status
+  // change, so that adds up).
+  const [
+    { data: games, error: gamesError },
+    { data: session, error: sessionError },
+    { data: playerSessions, error: psError },
+  ] = await Promise.all([
     supabase
       .from("games")
       .select("player1_id, player2_id, player3_id, player4_id")
       .eq("session_id", sessionId)
       .in("status", ["Ongoing", "Done"]),
     supabase.from("sessions").select("shuttle_fee_per_game").eq("id", sessionId).single(),
+    supabase.from("player_sessions").select("id, player_id").eq("session_id", sessionId),
   ]);
   if (gamesError) throw new Error(gamesError.message);
   if (sessionError) throw new Error(sessionError.message);
+  if (psError) throw new Error(psError.message);
 
   const counts = new Map<string, number>();
   for (const g of games ?? []) {
@@ -38,12 +48,6 @@ async function recomputePlayerGameCounts(
       if (playerId) counts.set(playerId, (counts.get(playerId) ?? 0) + 1);
     }
   }
-
-  const { data: playerSessions, error: psError } = await supabase
-    .from("player_sessions")
-    .select("id, player_id")
-    .eq("session_id", sessionId);
-  if (psError) throw new Error(psError.message);
 
   const shuttleFeePerGame = session.shuttle_fee_per_game;
 

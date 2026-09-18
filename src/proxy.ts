@@ -9,6 +9,17 @@ import { createServerClient } from "@supabase/ssr";
  * bounced to `/login`, and a signed-in user hitting `/login` is bounced to
  * `/`. This is what makes the deployed app private instead of open to
  * anyone who finds the URL.
+ *
+ * Uses `getSession()` (reads the session straight out of the request
+ * cookie, no network call) rather than `getUser()` (asks Supabase's Auth
+ * server to re-verify the token — a real round trip). This runs on every
+ * single request the app makes, so that round trip was adding noticeable
+ * delay to every click. The trade-off: a forged/expired cookie could slip
+ * past this check instead of being bounced straight to /login — but every
+ * actual data read/write still goes through Supabase with that same cookie,
+ * and Supabase itself rejects an invalid token there, so the practical risk
+ * for this small private app is low (worst case is a confusing error
+ * instead of a redirect, not exposed data).
  */
 const PUBLIC_PATHS = ["/login"];
 
@@ -41,18 +52,18 @@ export async function proxy(request: NextRequest) {
   );
 
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
 
   const isPublicPath = PUBLIC_PATHS.includes(request.nextUrl.pathname);
 
-  if (!user && !isPublicPath) {
+  if (!session && !isPublicPath) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
-  if (user && isPublicPath) {
+  if (session && isPublicPath) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     return NextResponse.redirect(url);
