@@ -14,13 +14,20 @@ export const metadata: Metadata = {
 
 /** Whether the signed-in visitor is an admin — decides whether the nav
  * shows the Settings and Accounts icons at all (see SidePanel). Not signed
- * in (e.g. on /login) just means not an admin, same as any other visitor. */
+ * in (e.g. on /login) just means not an admin, same as any other visitor.
+ *
+ * Uses `getSession()` (reads the JWT out of the cookie, no network call)
+ * rather than `getUser()` (a real round trip to Supabase's Auth server) —
+ * same trade-off already made in proxy.ts, and for the same reason: this
+ * runs in RootLayout, i.e. on every single page render, so a `getUser()`
+ * here was adding a second per-request network round trip right back on
+ * top of the one proxy.ts already eliminated. */
 async function getIsAdmin(): Promise<boolean> {
   const supabase = await createClient();
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return currentUserRole(user ?? undefined) === "admin";
+    data: { session },
+  } = await supabase.auth.getSession();
+  return currentUserRole(session?.user ?? undefined) === "admin";
 }
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {

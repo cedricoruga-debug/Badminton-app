@@ -2,6 +2,7 @@
 
 import { createSession } from "@/app/actions";
 import { Modal } from "@/app/components/Modal";
+import { SubmitButton } from "@/app/components/SubmitButton";
 import { IconCalendarPlus } from "@/app/components/icons";
 
 /** Today's date as a local YYYY-MM-DD string (not UTC — toISOString() alone
@@ -74,12 +75,12 @@ export function NewSessionButton() {
             >
               Cancel
             </button>
-            <button
-              type="submit"
+            <SubmitButton
               className="rounded bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark"
+              pendingLabel="Saving…"
             >
               Save
-            </button>
+            </SubmitButton>
           </div>
         </form>
       )}

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createPlayer } from "@/app/actions";
+import { SubmitButton } from "@/app/components/SubmitButton";
 import { IconUserPlus } from "@/app/components/icons";
 
 type SessionOption = { id: string; session_date: string };
@@ -76,12 +77,12 @@ export function NewPlayerButton({
         </div>
 
         <div className="flex justify-end">
-          <button
-            type="submit"
+          <SubmitButton
             className="rounded bg-brand px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-dark"
+            pendingLabel="Adding…"
           >
             Add player
-          </button>
+          </SubmitButton>
         </div>
       </form>
     </div>

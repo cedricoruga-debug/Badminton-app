@@ -2,6 +2,7 @@
 
 import { createPlayer } from "@/app/actions";
 import { Modal } from "@/app/components/Modal";
+import { SubmitButton } from "@/app/components/SubmitButton";
 import { IconUserPlus } from "@/app/components/icons";
 
 /** Small "+" button that opens a popup to register a new player for the
@@ -51,12 +52,12 @@ export function AddPlayerButton({ sessionId }: { sessionId: string }) {
             >
               Cancel
             </button>
-            <button
-              type="submit"
+            <SubmitButton
               className="rounded bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark"
+              pendingLabel="Adding…"
             >
               Add player
-            </button>
+            </SubmitButton>
           </div>
         </form>
       )}

@@ -29,7 +29,7 @@ function parseRole(raw: FormDataEntryValue | null): Role {
  * https://react.dev/errors/441 for that redaction behavior.
  */
 async function requireSignedIn(): Promise<
-  { user: { id: string } } | { error: string }
+  { user: { id: string; app_metadata?: Record<string, unknown> } } | { error: string }
 > {
   const supabase = await createClient();
   const {
@@ -41,18 +41,19 @@ async function requireSignedIn(): Promise<
 
 /** Same as requireSignedIn, but also requires the "admin" role — account
  * management (create/delete/reset password/change role) is admin-only, to
- * match the Accounts icon itself only showing for admins in the nav. */
+ * match the Accounts icon itself only showing for admins in the nav.
+ *
+ * Reuses the user requireSignedIn already fetched instead of calling
+ * getUser() a second time — these actions only fire on explicit clicks
+ * (not every page render like layout.tsx's getIsAdmin), so the network
+ * round trip itself is fine here, it just doesn't need to happen twice. */
 async function requireAdmin(): Promise<
   { user: { id: string } } | { error: string }
 > {
   const signedIn = await requireSignedIn();
   if ("error" in signedIn) return signedIn;
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (currentUserRole(user ?? undefined) !== "admin") {
+  if (currentUserRole(signedIn.user.app_metadata) !== "admin") {
     return { error: "Only an admin can do that." };
   }
   return signedIn;

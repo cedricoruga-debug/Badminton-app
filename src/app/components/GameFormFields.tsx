@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { deleteGame } from "@/app/actions";
+import { SubmitButton } from "@/app/components/SubmitButton";
 import type { PlayerSessionWithPlayer } from "@/lib/types";
 
 type SessionOption = { id: string; session_date: string };
@@ -11,6 +12,7 @@ const STATUSES: Array<{ value: "Queued" | "Ongoing" | "Done"; label: string }> =
   { value: "Ongoing", label: "Ongoing" },
   { value: "Done", label: "Done" },
 ];
+
 
 /**
  * Shared body for the New Game and Edit Game forms. Kept as its own
@@ -193,12 +195,12 @@ export function GameFormFields({
           >
             Cancel
           </button>
-          <button
-            type="submit"
+          <SubmitButton
             className="rounded bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark"
+            pendingLabel="Saving…"
           >
             {submitLabel}
-          </button>
+          </SubmitButton>
         </div>
       </div>
     </form>
