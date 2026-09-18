@@ -47,19 +47,19 @@ function AddAccountForm({ onDone }: { onDone: () => void }) {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    try {
-      const formData = new FormData();
-      formData.set("username", username);
-      formData.set("password", password);
-      await createAccount(formData);
-      setUsername("");
-      setPassword("");
-      onDone();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
-    } finally {
-      setLoading(false);
+    const formData = new FormData();
+    formData.set("username", username);
+    formData.set("password", password);
+    const result = await createAccount(formData);
+    setLoading(false);
+
+    if (result.error) {
+      setError(result.error);
+      return;
     }
+    setUsername("");
+    setPassword("");
+    onDone();
   }
 
   return (
@@ -109,6 +109,7 @@ function AccountRow({
 }) {
   const [isDeleting, startDeleteTransition] = useTransition();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [resetting, setResetting] = useState(false);
 
   return (
@@ -142,7 +143,17 @@ function AccountRow({
                 <button
                   type="button"
                   disabled={isDeleting}
-                  onClick={() => startDeleteTransition(() => deleteAccount(account.id).then(onDone))}
+                  onClick={() =>
+                    startDeleteTransition(async () => {
+                      const result = await deleteAccount(account.id);
+                      if (result.error) {
+                        setDeleteError(result.error);
+                        setConfirmingDelete(false);
+                        return;
+                      }
+                      onDone();
+                    })
+                  }
                   className="rounded bg-red-500 px-2 py-1 text-[10px] font-medium text-white transition-colors hover:bg-red-600 disabled:opacity-50"
                 >
                   Delete
@@ -170,6 +181,8 @@ function AccountRow({
         </div>
       </div>
 
+      {deleteError && <p className="mt-2 text-xs text-red-600">{deleteError}</p>}
+
       {resetting && (
         <ResetPasswordForm
           userId={account.id}
@@ -192,16 +205,16 @@ function ResetPasswordForm({ userId, onDone }: { userId: string; onDone: () => v
     e.preventDefault();
     setError(null);
     setLoading(true);
-    try {
-      const formData = new FormData();
-      formData.set("password", password);
-      await resetAccountPassword(userId, formData);
-      onDone();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
-    } finally {
-      setLoading(false);
+    const formData = new FormData();
+    formData.set("password", password);
+    const result = await resetAccountPassword(userId, formData);
+    setLoading(false);
+
+    if (result.error) {
+      setError(result.error);
+      return;
     }
+    onDone();
   }
 
   return (
