@@ -37,13 +37,89 @@ export default async function Home() {
       ])
     : [[], [], 0, [], []];
 
-  return (
+  // The 4 shortcut buttons — rendered twice below (once for the portrait
+  // static top bar, once back in their original spot at the bottom of the
+  // QR panel for landscape/desktop), CSS-toggled so only one is visible at
+  // a time. Each is its own independent element/component instance, same
+  // pattern as the nav rail vs. bottom nav bar in SidePanel.
+  const shortcutButtons = (
     <>
-      <main className="grid h-[calc(100vh-60px)] grid-cols-[1fr_1.8fr_0.8fr] gap-4 p-4">
+      <NewSessionButton />
+
+      <Link href="/games" className="flex flex-col items-center gap-1">
+        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand text-white transition-transform hover:scale-105">
+          <IconTrophy className="h-4 w-4" />
+        </span>
+        <span className="text-[10px] leading-tight text-black/60">Games</span>
+      </Link>
+
+      {session ? (
+        <NewGameButton
+          sessionId={session.id}
+          sessions={sessions}
+          players={sessionPlayers.filter((ps) => !ps.done_for_session)}
+          nextGameNumber={totalGameCount + 1}
+        />
+      ) : (
+        <div className="flex flex-col items-center gap-1 opacity-40">
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand text-white">
+            <IconPlus className="h-5 w-5" />
+          </span>
+          <span className="text-[10px] leading-tight text-black/60">New Game</span>
+        </div>
+      )}
+
+      {session ? (
+        <NewPlayerButton sessions={sessions} defaultSessionId={session.id} />
+      ) : (
+        <div className="flex flex-col items-center gap-1 opacity-40">
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand text-white">
+            <IconUserPlus className="h-4 w-4" />
+          </span>
+          <span className="text-[10px] leading-tight text-black/60">New player</span>
+        </div>
+      )}
+    </>
+  );
+
+  return (
+    <div className="flex flex-col landscape:h-[calc(100vh-60px)] landscape:overflow-hidden">
+      {/* Static shortcuts bar — portrait/mobile only. Stays put at the top
+       * (sticky under the header) so these are always one tap away without
+       * scrolling all the way down to the QR panel. In landscape/desktop
+       * the buttons go back to their original spot at the bottom of the QR
+       * panel below, so this bar is hidden there instead. */}
+      <div className="sticky top-[60px] z-30 flex-none px-4 pt-4 landscape:hidden">
+        <div className="rounded-xl bg-white p-3 shadow-sm">
+          <div className="grid grid-cols-2 gap-x-2 gap-y-3 text-center">{shortcutButtons}</div>
+        </div>
+      </div>
+
+      <main className="flex flex-1 flex-col gap-4 px-4 pb-4 pt-4 landscape:grid landscape:min-h-0 landscape:grid-cols-[1fr_1.8fr_0.8fr]">
+        {/* Games Queued — what's left to play this session. Stays first in
+         * the markup (so portrait/mobile shows it on top, per an earlier
+         * request), but in landscape/desktop it's reordered back to the
+         * middle/widest column via `order`, with Players back in the first
+         * (narrower) column — the original desktop arrangement. */}
+        <section className="flex min-h-0 min-w-0 flex-col rounded-xl bg-white p-4 shadow-sm landscape:order-2 landscape:h-full">
+          <h3 className="mb-3 flex-none font-semibold">Games Queued</h3>
+          <ul className="max-h-96 overflow-x-hidden overflow-y-auto landscape:min-h-0 landscape:max-h-none landscape:flex-1">
+            {!session ? (
+              <li className="py-8 text-center text-sm text-black/50">No ongoing session yet.</li>
+            ) : queuedGames.length === 0 ? (
+              <li className="py-10 text-center text-sm text-black/40">No games queued right now.</li>
+            ) : (
+              queuedGames.map((g) => (
+                <GameRow key={g.id} game={g} sessions={sessions} players={sessionPlayers} />
+              ))
+            )}
+          </ul>
+        </section>
+
         {/* Players — those registered for the latest session who haven't paid yet */}
-        <section className="flex h-full min-h-0 min-w-0 flex-col rounded-xl bg-white p-4 shadow-sm">
+        <section className="flex min-h-0 min-w-0 flex-col rounded-xl bg-white p-4 shadow-sm landscape:order-1 landscape:h-full">
           <h3 className="mb-3 flex-none font-semibold">Players</h3>
-          <ul className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
+          <ul className="max-h-64 overflow-x-hidden overflow-y-auto landscape:min-h-0 landscape:max-h-none landscape:flex-1">
             {!session ? (
               <li className="py-8 text-center text-sm text-black/50">
                 No sessions yet. Create one in Supabase (or wire up a &quot;New session&quot; button next) to get
@@ -57,24 +133,8 @@ export default async function Home() {
           </ul>
         </section>
 
-        {/* Games Queued — the biggest panel: what's left to play this session */}
-        <section className="flex h-full min-h-0 min-w-0 flex-col rounded-xl bg-white p-4 shadow-sm">
-          <h3 className="mb-3 flex-none font-semibold">Games Queued</h3>
-          <ul className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
-            {!session ? (
-              <li className="py-8 text-center text-sm text-black/50">No ongoing session yet.</li>
-            ) : queuedGames.length === 0 ? (
-              <li className="py-10 text-center text-sm text-black/40">No games queued right now.</li>
-            ) : (
-              queuedGames.map((g) => (
-                <GameRow key={g.id} game={g} sessions={sessions} players={sessionPlayers} />
-              ))
-            )}
-          </ul>
-        </section>
-
-        {/* Slim panel: payment QR, shortcuts, stats */}
-        <section className="h-full min-w-0 overflow-x-hidden overflow-y-auto rounded-xl bg-white p-4 shadow-sm">
+        {/* Slim panel: payment QR + stats, at the bottom */}
+        <section className="min-w-0 overflow-x-hidden rounded-xl bg-white p-4 shadow-sm landscape:order-3 landscape:h-full landscape:overflow-y-auto">
           {settings?.payment_qr_url ? (
             <div className="flex flex-col items-center gap-2">
               {/* eslint-disable-next-line @next/next/no-img-element -- external, user-uploaded QR image of unknown origin */}
@@ -93,42 +153,8 @@ export default async function Home() {
             </div>
           )}
 
-          <div className="mt-5 grid grid-cols-2 gap-x-2 gap-y-3 text-center">
-            <NewSessionButton />
-
-            <Link href="/games" className="flex flex-col items-center gap-1">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand text-white transition-transform hover:scale-105">
-                <IconTrophy className="h-4 w-4" />
-              </span>
-              <span className="text-[10px] leading-tight text-black/60">Games</span>
-            </Link>
-
-            {session ? (
-              <NewGameButton
-                sessionId={session.id}
-                sessions={sessions}
-                players={sessionPlayers.filter((ps) => !ps.done_for_session)}
-                nextGameNumber={totalGameCount + 1}
-              />
-            ) : (
-              <div className="flex flex-col items-center gap-1 opacity-40">
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand text-white">
-                  <IconPlus className="h-5 w-5" />
-                </span>
-                <span className="text-[10px] leading-tight text-black/60">New Game</span>
-              </div>
-            )}
-
-            {session ? (
-              <NewPlayerButton sessions={sessions} defaultSessionId={session.id} />
-            ) : (
-              <div className="flex flex-col items-center gap-1 opacity-40">
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand text-white">
-                  <IconUserPlus className="h-4 w-4" />
-                </span>
-                <span className="text-[10px] leading-tight text-black/60">New player</span>
-              </div>
-            )}
+          <div className="mt-5 hidden grid-cols-2 gap-x-2 gap-y-3 text-center landscape:grid">
+            {shortcutButtons}
           </div>
 
           <dl className="mt-5 space-y-2 border-t border-black/10 pt-4 text-sm">
@@ -145,6 +171,6 @@ export default async function Home() {
           </dl>
         </section>
       </main>
-    </>
+    </div>
   );
 }

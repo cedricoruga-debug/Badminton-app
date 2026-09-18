@@ -13,7 +13,15 @@ const LINKS = [
   { href: "/player-sessions", label: "Players", icon: IconUsers },
 ];
 
-/** Persistent icon rail pinned to the right edge, under the header. */
+/**
+ * App navigation. On desktop this is a persistent icon rail pinned to the
+ * right edge, under the header. Below the `md` breakpoint (phones/small
+ * tablets) that rail would sit awkwardly off to the side and eat into the
+ * already-narrow content width, so instead we render the same links as a
+ * thumb-reachable bar fixed to the bottom of the screen. Only one of the
+ * two is ever visible at a time — the other is hidden with CSS, not
+ * unmounted, so each keeps its own state (e.g. the Settings popup).
+ */
 export function SidePanel({ settings }: { settings: AppSettings | null }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -25,8 +33,8 @@ export function SidePanel({ settings }: { settings: AppSettings | null }) {
     router.refresh();
   }
 
-  return (
-    <nav className="sticky top-[60px] flex h-[calc(100vh-60px)] w-16 flex-none flex-col items-center gap-3 border-l border-black/10 bg-white pt-4">
+  const navLinks = (
+    <>
       {LINKS.map(({ href, label, icon: Icon }) => {
         const active = pathname === href;
         return (
@@ -56,16 +64,38 @@ export function SidePanel({ settings }: { settings: AppSettings | null }) {
       >
         <IconKey className="h-5 w-5" />
       </Link>
+    </>
+  );
 
-      <button
-        type="button"
-        onClick={handleLogout}
-        title="Log out"
-        aria-label="Log out"
-        className="mt-auto mb-4 flex h-10 w-10 items-center justify-center rounded-lg text-black/50 transition-colors hover:bg-red-50 hover:text-red-500"
-      >
-        <IconLogout className="h-5 w-5" />
-      </button>
-    </nav>
+  return (
+    <>
+      {/* Desktop: right-hand icon rail */}
+      <nav className="sticky top-[60px] hidden h-[calc(100vh-60px)] w-16 flex-none flex-col items-center gap-3 border-l border-black/10 bg-white pt-4 landscape:flex">
+        {navLinks}
+        <button
+          type="button"
+          onClick={handleLogout}
+          title="Log out"
+          aria-label="Log out"
+          className="mt-auto mb-4 flex h-10 w-10 items-center justify-center rounded-lg text-black/50 transition-colors hover:bg-red-50 hover:text-red-500"
+        >
+          <IconLogout className="h-5 w-5" />
+        </button>
+      </nav>
+
+      {/* Mobile: bottom nav bar */}
+      <nav className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t border-black/10 bg-white px-1 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] landscape:hidden">
+        {navLinks}
+        <button
+          type="button"
+          onClick={handleLogout}
+          title="Log out"
+          aria-label="Log out"
+          className="flex h-10 w-10 items-center justify-center rounded-lg text-black/50 transition-colors hover:bg-red-50 hover:text-red-500"
+        >
+          <IconLogout className="h-5 w-5" />
+        </button>
+      </nav>
+    </>
   );
 }

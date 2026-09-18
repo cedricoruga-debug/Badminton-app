@@ -28,19 +28,19 @@ export default async function PlayerSessionsPage(props: PageProps<"/player-sessi
   const selectedGames = selectedSessionId ? await getGames(selectedSessionId) : [];
 
   return (
-    <div className="flex h-[calc(100vh-60px)] flex-col overflow-hidden p-4">
+    <div className="flex flex-col p-4 landscape:h-[calc(100vh-60px)] landscape:overflow-hidden">
       <Breadcrumb current="Player Sessions" />
 
       {sessions.length === 0 ? (
         <p className="py-8 text-center text-sm text-black/40">No sessions yet.</p>
       ) : (
-        <div className="flex min-h-0 flex-1 items-stretch gap-4">
+        <div className="flex flex-col gap-4 landscape:min-h-0 landscape:flex-1 landscape:flex-row landscape:items-stretch">
           {/* Dates panel — header fixed, only the date list scrolls */}
-          <section className="flex w-56 flex-none flex-col overflow-hidden rounded-xl bg-white p-3 shadow-sm">
+          <section className="flex w-full flex-none flex-col overflow-hidden rounded-xl bg-white p-3 shadow-sm landscape:w-56">
             <h3 className="mb-2 flex-none px-1 text-xs font-semibold uppercase tracking-wide text-black/40">
               Dates
             </h3>
-            <ul className="min-h-0 flex-1 space-y-1 overflow-x-hidden overflow-y-auto">
+            <ul className="max-h-48 space-y-1 overflow-x-hidden overflow-y-auto landscape:min-h-0 landscape:max-h-none landscape:flex-1">
               {sessions.map((s) => {
                 const active = s.id === selectedSessionId;
                 return (
@@ -63,8 +63,8 @@ export default async function PlayerSessionsPage(props: PageProps<"/player-sessi
           </section>
 
           {/* Players for the selected date — scrolls within its own panel */}
-          <section className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl bg-white p-4 shadow-sm">
-            <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
+          <section className="flex min-w-0 flex-col overflow-hidden rounded-xl bg-white p-4 shadow-sm landscape:flex-1">
+            <div className="overflow-x-hidden landscape:min-h-0 landscape:flex-1 landscape:overflow-y-auto">
               {selectedRows.length === 0 ? (
                 <p className="py-10 text-center text-sm text-black/40">No players registered for this date.</p>
               ) : (

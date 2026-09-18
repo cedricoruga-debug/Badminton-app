@@ -46,19 +46,19 @@ export default async function SessionsPage(props: PageProps<"/sessions">) {
   );
 
   return (
-    <div className="flex h-[calc(100vh-60px)] flex-col overflow-hidden p-4">
+    <div className="flex flex-col p-4 landscape:h-[calc(100vh-60px)] landscape:overflow-hidden">
       <Breadcrumb current="Sessions" />
 
       {sessions.length === 0 ? (
         <p className="py-8 text-center text-sm text-black/40">No sessions yet.</p>
       ) : (
-        <div className="flex min-h-0 flex-1 items-stretch gap-4">
+        <div className="flex flex-col gap-4 landscape:min-h-0 landscape:flex-1 landscape:flex-row landscape:items-stretch">
           {/* Dates panel — header fixed, only the date list scrolls */}
-          <section className="flex w-56 flex-none flex-col overflow-hidden rounded-xl bg-white p-3 shadow-sm">
+          <section className="flex w-full flex-none flex-col overflow-hidden rounded-xl bg-white p-3 shadow-sm landscape:w-56">
             <h3 className="mb-2 flex-none px-1 text-xs font-semibold uppercase tracking-wide text-black/40">
               Dates
             </h3>
-            <ul className="min-h-0 flex-1 space-y-1 overflow-x-hidden overflow-y-auto">
+            <ul className="max-h-48 space-y-1 overflow-x-hidden overflow-y-auto landscape:min-h-0 landscape:max-h-none landscape:flex-1">
               {sessions.map((s) => {
                 const active = s.id === selectedSessionId;
                 return (
@@ -81,14 +81,14 @@ export default async function SessionsPage(props: PageProps<"/sessions">) {
           </section>
 
           {/* Selected session's breakdown (fixed) with its players below (scrolls on its own) */}
-          <section className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl bg-white p-4 shadow-sm">
+          <section className="flex min-w-0 flex-col overflow-hidden rounded-xl bg-white p-4 shadow-sm landscape:flex-1">
             <div className="flex-none">
               <div className="mb-2 flex items-center justify-between px-1">
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-black/40">Details</h3>
                 {selectedSession && <EditSessionButton session={selectedSession} />}
               </div>
               {selectedSession && (
-                <dl className="mb-6 grid grid-cols-3 gap-x-8 gap-y-4 text-sm">
+                <dl className="mb-6 grid grid-cols-2 gap-x-6 gap-y-4 text-sm landscape:grid-cols-3 landscape:gap-x-8">
                   <Stat label="Hours" value={selectedSession.hours} />
                   <Stat label="Fee / hour" value={`₱${selectedSession.fee_per_hour.toFixed(2)}`} />
                   <Stat label="Court fee" value={`₱${selectedSession.court_fee.toFixed(2)}`} />
@@ -103,7 +103,7 @@ export default async function SessionsPage(props: PageProps<"/sessions">) {
                 </dl>
               )}
               {selectedSession && (
-                <dl className="mb-6 grid grid-cols-3 gap-x-8 gap-y-4 border-t border-black/10 pt-3 text-sm">
+                <dl className="mb-6 grid grid-cols-2 gap-x-6 gap-y-4 border-t border-black/10 pt-3 text-sm landscape:grid-cols-3 landscape:gap-x-8">
                   <Stat
                     label="Total payable"
                     value={`₱${selectedSession.total_payable.toFixed(2)}`}
@@ -127,12 +127,12 @@ export default async function SessionsPage(props: PageProps<"/sessions">) {
               )}
             </div>
 
-            <div className="flex min-h-0 flex-1 flex-col">
+            <div className="flex flex-col landscape:min-h-0 landscape:flex-1">
               <div className="mb-2 flex flex-none items-center justify-between px-1">
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-black/40">Players</h3>
                 {selectedSessionId && <AddPlayerButton sessionId={selectedSessionId} />}
               </div>
-              <ul className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
+              <ul className="overflow-x-hidden landscape:min-h-0 landscape:flex-1 landscape:overflow-y-auto">
                 {selectedPlayers.length === 0 ? (
                   <li className="py-4 text-sm text-black/50">No players registered for this date.</li>
                 ) : (

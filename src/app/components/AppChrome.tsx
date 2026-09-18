@@ -40,7 +40,9 @@ export function AppChrome({
         <h1 className="text-lg font-semibold">{APP_TITLE}</h1>
       </header>
       <div className="flex flex-1">
-        <div className="min-w-0 flex-1">{children}</div>
+        {/* pb-20 clears the fixed bottom nav bar on mobile; not needed once
+         * that bar disappears in favor of the desktop side rail at md. */}
+        <div className="min-w-0 flex-1 pb-20 landscape:pb-0">{children}</div>
         <SidePanel settings={settings} />
       </div>
     </div>
