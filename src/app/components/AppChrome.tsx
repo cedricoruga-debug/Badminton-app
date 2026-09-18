@@ -25,7 +25,7 @@ const MIN_MS_BETWEEN_REFOCUS_REFRESH = 5000;
 /**
  * Keeps the current page's data in sync with everyone else's — the whole
  * reason this exists is "I deleted something on my phone and my laptop
- * didn't notice." Two mechanisms, layered:
+ * didn't notice." Three mechanisms, layered:
  *
  * 1. Supabase Realtime: subscribes to every table the app reads from and
  *    re-fetches the page the moment any row changes, anywhere — including
@@ -34,7 +34,15 @@ const MIN_MS_BETWEEN_REFOCUS_REFRESH = 5000;
  *    anything to browser tabs that already have the page open. Requires
  *    Realtime to be turned on for these tables in Supabase (see DEPLOY.md);
  *    if it isn't, this subscribes without error but simply never fires.
- * 2. Refocus fallback: phones aggressively suspend background tabs'
+ * 2. Reconnect catch-up: the websocket to Supabase drops from time to time
+ *    on its own — routers and ISPs commonly kill an idle connection after a
+ *    minute or two of silence, nothing to do with this app. The client
+ *    reconnects automatically, but a fresh subscription has no memory of
+ *    what happened while it was down, so anything that changed in that gap
+ *    would otherwise sit missed until something else triggers a refresh.
+ *    Doing one refresh right as a connection comes back (not on the very
+ *    first connect, only on a *re*-connect) closes that gap.
+ * 3. Refocus fallback: phones aggressively suspend background tabs'
  *    websockets, so Realtime's socket can be dead by the time you switch
  *    back. Refreshing on refocus catches anything missed while the socket
  *    was down, regardless of whether Realtime is configured at all.
@@ -46,6 +54,7 @@ function useLiveRefresh() {
   useEffect(() => {
     const supabase = createClient();
     let coalesceTimer: ReturnType<typeof setTimeout> | null = null;
+    let hasSubscribedOnce = false;
 
     function refreshNow() {
       lastRefresh.current = Date.now();
@@ -62,7 +71,16 @@ function useLiveRefresh() {
     for (const table of WATCHED_TABLES) {
       channel.on("postgres_changes", { event: "*", schema: "public", table }, onDbChange);
     }
-    channel.subscribe();
+    channel.subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        if (hasSubscribedOnce) {
+          // A reconnect after a drop, not the initial connect — catch up on
+          // whatever happened while the socket was down.
+          refreshNow();
+        }
+        hasSubscribedOnce = true;
+      }
+    });
 
     function onRefocus() {
       if (document.visibilityState !== "visible") return;
