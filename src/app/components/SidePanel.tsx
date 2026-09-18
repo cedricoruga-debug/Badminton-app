@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { IconCalendar, IconHome, IconLogout, IconUsers } from "@/app/components/icons";
+import { IconCalendar, IconHome, IconKey, IconLogout, IconUsers } from "@/app/components/icons";
 import { SettingsButton } from "@/app/components/SettingsButton";
 import { createClient } from "@/lib/supabase/client";
 import type { AppSettings } from "@/lib/types";
@@ -45,6 +45,17 @@ export function SidePanel({ settings }: { settings: AppSettings | null }) {
       })}
 
       <SettingsButton settings={settings} />
+
+      <Link
+        href="/users"
+        title="Accounts"
+        aria-label="Accounts"
+        className={`flex h-10 w-10 items-center justify-center rounded-lg transition-colors ${
+          pathname === "/users" ? "bg-brand text-white" : "text-black/50 hover:bg-brand-light hover:text-brand"
+        }`}
+      >
+        <IconKey className="h-5 w-5" />
+      </Link>
 
       <button
         type="button"

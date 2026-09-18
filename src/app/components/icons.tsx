@@ -188,6 +188,17 @@ export function IconPeso({ className }: IconProps) {
   );
 }
 
+export function IconKey({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <circle cx="8" cy="15" r="3.5" />
+      <path d="M10.5 12.5 20 3" />
+      <path d="M16.5 6.5 19 9" />
+      <path d="M13.5 9.5 15.5 11.5" />
+    </svg>
+  );
+}
+
 export function IconLogout({ className }: IconProps) {
   return (
     <svg {...base} className={className}>

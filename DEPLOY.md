@@ -5,11 +5,11 @@ This app now has a login (see below), so it's safe to put it on the public inter
 ## 1. Lock down the database (do this first, before deploying)
 
 1. Open your Supabase project → **SQL Editor** → paste in the contents of `supabase/enable_auth_policies.sql` from this repo → **Run**. This switches every table from "anyone with the app's public key can read/write" to "must be signed in."
-2. Still in Supabase: **Authentication → Users → Add user**.
-   - Email: `cedric.oruga@gmail.com`
-   - Password: pick your own (don't use a placeholder like `123456` — since you're creating this yourself, just set the real one directly; there's no need for a temporary password you'd have to change later).
-   - Check **Auto Confirm User** so it doesn't wait on a confirmation email.
-3. That's your login for the deployed app. You can add more users the same way later, and everyone can change their own password from the app's Settings icon once signed in.
+2. Still in Supabase: **Authentication → Users → Add user**. The app logs in with a **username**, not an email — but Supabase Auth only understands "email" internally, so each account's real login email is that username plus a fake domain that never sends or receives real mail: `<username>@badminton.local`. This one dashboard-created account is just to bootstrap your own first login:
+   - Email: `ced@badminton.local` (username: `ced`)
+   - Password: pick a real one directly — no need for a placeholder you'd have to change later.
+   - Check **Auto Confirm User** so it doesn't wait on a confirmation email (nothing is ever actually sent to that fake address).
+3. Once you can sign in, add everyone else from inside the app instead — the **Accounts** icon (key icon) in the right-hand rail opens a page to add, delete, and reset passwords for accounts, so you don't need to touch the Supabase dashboard again for that. Everyone signs in with just their username (`ced`, `ron`, `tey`, …) and their own password, and can change their own password later from the Settings icon.
 
 ## 2. Push the code to GitHub
 
@@ -34,12 +34,13 @@ Run those (copy them straight from GitHub's "push an existing repository" instru
 ## 3. Deploy on Vercel
 
 1. On vercel.com, **Add New → Project**, and import the GitHub repo you just pushed.
-2. Before clicking Deploy, open **Environment Variables** and add the same two values from your local `.env.local` file:
+2. Before clicking Deploy, open **Environment Variables** and add the same values from your local `.env.local` file:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY` (from Supabase → Project Settings → API — this is what powers the in-app Accounts page. Add it exactly as `SUPABASE_SERVICE_ROLE_KEY`, with no `NEXT_PUBLIC_` prefix, so it stays server-only)
 3. Click **Deploy**. Vercel gives you a `https://<project>.vercel.app` link when it's done — that's what you open on your iPad/phone.
 4. From now on, every `git push` to `main` auto-deploys the latest version — no extra steps.
 
 ## 4. First login
 
-Open the Vercel link, sign in with the email/password you created in step 1. You'll land on the same dashboard you're used to — it just now requires a login, and works from any device with a browser.
+Open the Vercel link, sign in with the username/password you created in step 1 (just the username, e.g. `ced` — not the `@badminton.local` part, that's only what Supabase stores internally). You'll land on the same dashboard you're used to — it just now requires a login, and works from any device with a browser.

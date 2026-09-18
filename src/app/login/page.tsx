@@ -10,10 +10,20 @@ import { IconShuttle } from "@/app/components/icons";
  * sign-up here on purpose: accounts are created directly in the Supabase
  * dashboard (Authentication → Users) so the app stays closed to whoever
  * finds the link, rather than letting anyone self-register.
+ *
+ * Supabase Auth only knows "email", not "username" — so under the hood
+ * each account's real login email is `<username>@badminton.local` (a fake
+ * domain that never sends or receives real mail; Auto Confirm skips the
+ * verification step). This page just asks for the username and appends
+ * that domain before calling Supabase, so from the user's side it's a
+ * plain username + password login. See DEPLOY.md for how to create
+ * accounts with this convention.
  */
+const USERNAME_DOMAIN = "@badminton.local";
+
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -23,12 +33,15 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
 
+    const email = username.trim().toLowerCase() + USERNAME_DOMAIN;
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithPassword({ email, password });
 
     setLoading(false);
     if (error) {
-      setError(error.message === "Invalid login credentials" ? "Wrong email or password." : error.message);
+      setError(
+        error.message === "Invalid login credentials" ? "Wrong username or password." : error.message
+      );
       return;
     }
 
@@ -49,14 +62,16 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-brand">Email</label>
+            <label className="mb-1 block text-sm font-medium text-brand">Username</label>
             <input
-              type="email"
+              type="text"
               required
               autoFocus
+              autoCapitalize="none"
+              autoCorrect="off"
               autoComplete="username"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               className="w-full rounded border border-black/15 px-3 py-2 text-sm"
             />
           </div>
