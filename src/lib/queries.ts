@@ -109,7 +109,7 @@ export async function getUnpaidPlayerSessions(
     .select("*, player:players(*)")
     .eq("session_id", sessionId)
     .is("payment_method", null)
-    .order("payable", { ascending: false });
+    .order("total_games", { ascending: true });
   if (error) {
     console.error("[getUnpaidPlayerSessions] Supabase error:", error);
   }
