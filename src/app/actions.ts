@@ -418,6 +418,25 @@ export async function updateSession(formData: FormData) {
   redirect(`/sessions?session=${sessionId}`);
 }
 
+/**
+ * Permanently delete a session and everything tied to it — its games and
+ * player registrations cascade-delete along with it (foreign keys with
+ * `on delete cascade` in schema.sql). For a session created by mistake or
+ * that "didn't push through" (e.g. started but nobody actually played).
+ */
+export async function deleteSession(sessionId: string) {
+  const supabase = await createClient();
+
+  const { error } = await supabase.from("sessions").delete().eq("id", sessionId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/");
+  revalidatePath("/sessions");
+  revalidatePath("/games");
+  revalidatePath("/player-sessions");
+  redirect("/sessions");
+}
+
 function parseGameStatus(value: FormDataEntryValue | null): "Queued" | "Ongoing" | "Done" {
   const s = String(value);
   return s === "Ongoing" || s === "Done" ? s : "Queued";
