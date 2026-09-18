@@ -52,16 +52,28 @@ async function recomputePlayerGameCounts(
 
   const shuttleFeePerGame = session.shuttle_fee_per_game;
 
-  await Promise.all(
-    (playerSessions ?? []).map(async (ps) => {
+  // One request updating every player_session row at once, instead of one
+  // request per player (this function runs after every game
+  // create/edit/delete/status change, so with a full roster that used to
+  // mean a dozen-plus parallel round trips just to update a count). Postgres
+  // needs the not-null columns present even on a row that's really just
+  // getting updated (session_id/player_id are unchanged — same values the
+  // row already has — but ON CONFLICT DO UPDATE still validates the
+  // candidate row before it realizes there's a conflict to resolve).
+  if ((playerSessions ?? []).length > 0) {
+    const rows = playerSessions!.map((ps) => {
       const totalGames = counts.get(ps.player_id) ?? 0;
-      const { error } = await supabase
-        .from("player_sessions")
-        .update({ total_games: totalGames, shuttle_share: totalGames * shuttleFeePerGame })
-        .eq("id", ps.id);
-      if (error) throw new Error(error.message);
-    })
-  );
+      return {
+        id: ps.id,
+        session_id: sessionId,
+        player_id: ps.player_id,
+        total_games: totalGames,
+        shuttle_share: totalGames * shuttleFeePerGame,
+      };
+    });
+    const { error } = await supabase.from("player_sessions").upsert(rows, { onConflict: "id" });
+    if (error) throw new Error(error.message);
+  }
 }
 
 /** Toggle a game between "Queued" and "Done" (was the AppSheet "Done" action). */
