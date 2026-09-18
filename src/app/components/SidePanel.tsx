@@ -22,7 +22,7 @@ const LINKS = [
  * two is ever visible at a time — the other is hidden with CSS, not
  * unmounted, so each keeps its own state (e.g. the Settings popup).
  */
-export function SidePanel({ settings }: { settings: AppSettings | null }) {
+export function SidePanel({ settings, isAdmin }: { settings: AppSettings | null; isAdmin: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -52,18 +52,22 @@ export function SidePanel({ settings }: { settings: AppSettings | null }) {
         );
       })}
 
-      <SettingsButton settings={settings} />
+      {isAdmin && (
+        <>
+          <SettingsButton settings={settings} />
 
-      <Link
-        href="/users"
-        title="Accounts"
-        aria-label="Accounts"
-        className={`flex h-10 w-10 items-center justify-center rounded-lg transition-colors ${
-          pathname === "/users" ? "bg-brand text-white" : "text-black/50 hover:bg-brand-light hover:text-brand"
-        }`}
-      >
-        <IconKey className="h-5 w-5" />
-      </Link>
+          <Link
+            href="/users"
+            title="Accounts"
+            aria-label="Accounts"
+            className={`flex h-10 w-10 items-center justify-center rounded-lg transition-colors ${
+              pathname === "/users" ? "bg-brand text-white" : "text-black/50 hover:bg-brand-light hover:text-brand"
+            }`}
+          >
+            <IconKey className="h-5 w-5" />
+          </Link>
+        </>
+      )}
     </>
   );
 

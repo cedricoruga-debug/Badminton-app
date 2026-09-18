@@ -3,12 +3,16 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { USERNAME_DOMAIN } from "@/lib/accounts";
+import { currentUserRole, USERNAME_DOMAIN, type Role } from "@/lib/accounts";
 
 export type ActionResult = { error: string } | { error?: undefined };
 
 function normalizeUsername(raw: string) {
   return raw.trim().toLowerCase().replace(/\s+/g, "");
+}
+
+function parseRole(raw: FormDataEntryValue | null): Role {
+  return raw === "admin" ? "admin" : "user";
 }
 
 /**
@@ -35,13 +39,33 @@ async function requireSignedIn(): Promise<
   return { user };
 }
 
+/** Same as requireSignedIn, but also requires the "admin" role — account
+ * management (create/delete/reset password/change role) is admin-only, to
+ * match the Accounts icon itself only showing for admins in the nav. */
+async function requireAdmin(): Promise<
+  { user: { id: string } } | { error: string }
+> {
+  const signedIn = await requireSignedIn();
+  if ("error" in signedIn) return signedIn;
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (currentUserRole(user ?? undefined) !== "admin") {
+    return { error: "Only an admin can do that." };
+  }
+  return signedIn;
+}
+
 /** Create a new login account (the "Add account" form on /users). */
 export async function createAccount(formData: FormData): Promise<ActionResult> {
-  const signedIn = await requireSignedIn();
+  const signedIn = await requireAdmin();
   if ("error" in signedIn) return { error: signedIn.error };
 
   const username = normalizeUsername(String(formData.get("username") ?? ""));
   const password = String(formData.get("password") ?? "");
+  const role = parseRole(formData.get("role"));
   if (!username) return { error: "Username is required." };
   if (!/^[a-z0-9_-]+$/.test(username)) {
     return { error: "Username can only contain letters, numbers, - and _." };
@@ -53,6 +77,7 @@ export async function createAccount(formData: FormData): Promise<ActionResult> {
     email: `${username}${USERNAME_DOMAIN}`,
     password,
     email_confirm: true,
+    app_metadata: { role },
   });
   if (error) {
     return {
@@ -69,7 +94,7 @@ export async function createAccount(formData: FormData): Promise<ActionResult> {
 /** Remove a login account. Can't delete the one you're currently signed in
  * as, so you can't accidentally lock yourself out. */
 export async function deleteAccount(userId: string): Promise<ActionResult> {
-  const signedIn = await requireSignedIn();
+  const signedIn = await requireAdmin();
   if ("error" in signedIn) return { error: signedIn.error };
   if (userId === signedIn.user.id) {
     return { error: "You can't delete the account you're currently signed in as." };
@@ -90,7 +115,7 @@ export async function resetAccountPassword(
   userId: string,
   formData: FormData
 ): Promise<ActionResult> {
-  const signedIn = await requireSignedIn();
+  const signedIn = await requireAdmin();
   if ("error" in signedIn) return { error: signedIn.error };
 
   const password = String(formData.get("password") ?? "");
@@ -98,6 +123,24 @@ export async function resetAccountPassword(
 
   const admin = createAdminClient();
   const { error } = await admin.auth.admin.updateUserById(userId, { password });
+  if (error) return { error: error.message };
+
+  revalidatePath("/users");
+  return {};
+}
+
+/** Change an account's role between Admin and User. Can't change your own
+ * role — same self-protection as deleteAccount, so an admin can't fat-finger
+ * their way into locking themselves out of account management. */
+export async function updateAccountRole(userId: string, role: Role): Promise<ActionResult> {
+  const signedIn = await requireAdmin();
+  if ("error" in signedIn) return { error: signedIn.error };
+  if (userId === signedIn.user.id) {
+    return { error: "You can't change the role of the account you're currently signed in as." };
+  }
+
+  const admin = createAdminClient();
+  const { error } = await admin.auth.admin.updateUserById(userId, { app_metadata: { role } });
   if (error) return { error: error.message };
 
   revalidatePath("/users");

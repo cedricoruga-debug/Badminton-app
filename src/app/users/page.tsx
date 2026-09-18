@@ -1,21 +1,27 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { UsersManager } from "@/app/components/UsersManager";
-import { listAccounts } from "@/lib/accounts";
+import { currentUserRole, listAccounts } from "@/lib/accounts";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Account management — add/remove/reset-password for the people allowed to
- * sign in to this app. Anyone signed in can manage accounts here (it's a
- * small trusted group, not a public app), so there's no separate "admin"
- * role — just don't share the link with anyone you wouldn't hand a login to.
+ * Account management — add/remove/reset-password/change-role for the
+ * people allowed to sign in to this app. Admin-only: the Accounts icon in
+ * the nav only shows for admins in the first place, and this page
+ * double-checks server-side (same belt-and-suspenders reasoning as the
+ * Server Actions in ./actions.ts) so a non-admin can't just type the URL.
  */
 export default async function UsersPage() {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  if (currentUserRole(user ?? undefined) !== "admin") {
+    redirect("/");
+  }
 
   const accounts = await listAccounts();
 

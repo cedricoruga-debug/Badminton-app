@@ -44,3 +44,19 @@ Run those (copy them straight from GitHub's "push an existing repository" instru
 ## 4. First login
 
 Open the Vercel link, sign in with the username/password you created in step 1 (just the username, e.g. `ced` — not the `@badminton.local` part, that's only what Supabase stores internally). You'll land on the same dashboard you're used to — it just now requires a login, and works from any device with a browser.
+
+## 5. Roles (admin vs. user)
+
+Accounts have a role — **Admin** or **User**. Only admins see the Settings and Accounts icons in the nav at all, and only admins can add/delete accounts, reset someone's password, or change a role (the Accounts page itself redirects a non-admin straight back to the dashboard, and the underlying actions double-check the role too, so this isn't just a hidden button).
+
+New accounts created from the Accounts page pick a role right there, and any account's role can be changed later from the same page — except your own, so you can't accidentally strip yourself of admin.
+
+That "except your own" rule is also why the *very first* admin has to be set once directly in Supabase, the same one-time bootstrap as the very first login account in step 1 — nobody starts as admin, so nobody could use the in-app dropdown to promote themselves. Open your Supabase project → **SQL Editor** → run:
+
+```sql
+update auth.users
+set raw_app_meta_data = coalesce(raw_app_meta_data, '{}'::jsonb) || '{"role": "admin"}'::jsonb
+where email = 'ced@badminton.local';
+```
+
+(swap `ced@badminton.local` for whichever username you used in step 1, if different). After that, sign out and back in — every account created or promoted from then on is handled entirely from the Accounts page, no more SQL needed.

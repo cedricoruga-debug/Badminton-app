@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { currentUserRole } from "@/lib/accounts";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -354,6 +355,17 @@ export async function addPlayerToSession(formData: FormData) {
  */
 export async function updateAppSettings(formData: FormData) {
   const supabase = await createClient();
+
+  // The Settings icon that opens this form only shows for admins in the
+  // nav — this is the server-side backstop for that, same reasoning as the
+  // admin checks in src/app/users/actions.ts.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (currentUserRole(user ?? undefined) !== "admin") {
+    throw new Error("Only an admin can change app settings.");
+  }
+
   const updates: Record<string, string> = {};
 
   const appIcon = formData.get("app_icon");

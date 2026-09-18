@@ -2,9 +2,9 @@
 
 import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { createAccount, deleteAccount, resetAccountPassword } from "@/app/users/actions";
+import { createAccount, deleteAccount, resetAccountPassword, updateAccountRole } from "@/app/users/actions";
 import { IconKey, IconTrash } from "@/app/components/icons";
-import type { Account } from "@/lib/accounts";
+import type { Account, Role } from "@/lib/accounts";
 
 export function UsersManager({
   accounts,
@@ -40,6 +40,7 @@ export function UsersManager({
 function AddAccountForm({ onDone }: { onDone: () => void }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [role, setRole] = useState<Role>("user");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -50,6 +51,7 @@ function AddAccountForm({ onDone }: { onDone: () => void }) {
     const formData = new FormData();
     formData.set("username", username);
     formData.set("password", password);
+    formData.set("role", role);
     const result = await createAccount(formData);
     setLoading(false);
 
@@ -59,6 +61,7 @@ function AddAccountForm({ onDone }: { onDone: () => void }) {
     }
     setUsername("");
     setPassword("");
+    setRole("user");
     onDone();
   }
 
@@ -85,6 +88,14 @@ function AddAccountForm({ onDone }: { onDone: () => void }) {
           required
           className="w-full rounded border border-black/15 px-3 py-2 text-sm"
         />
+        <select
+          value={role}
+          onChange={(e) => setRole(e.target.value as Role)}
+          className="w-full rounded border border-black/15 bg-white px-3 py-2 text-sm sm:w-auto"
+        >
+          <option value="user">User</option>
+          <option value="admin">Admin</option>
+        </select>
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <button
@@ -111,18 +122,54 @@ function AccountRow({
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [resetting, setResetting] = useState(false);
+  const [isUpdatingRole, startRoleTransition] = useTransition();
+  const [roleError, setRoleError] = useState<string | null>(null);
+
+  function handleRoleChange(role: Role) {
+    setRoleError(null);
+    startRoleTransition(async () => {
+      const result = await updateAccountRole(account.id, role);
+      if (result.error) {
+        setRoleError(result.error);
+        return;
+      }
+      onDone();
+    });
+  }
 
   return (
     <div className="rounded-xl bg-white p-4 shadow-sm">
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <p className="truncate font-medium">
-            {account.username}
-            {isSelf && <span className="ml-2 text-xs text-black/40">(you)</span>}
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="truncate font-medium">
+              {account.username}
+              {isSelf && <span className="ml-2 text-xs text-black/40">(you)</span>}
+            </p>
+          </div>
           <p className="text-xs text-black/40">
             Added {new Date(account.createdAt).toLocaleDateString("en-US")}
           </p>
+          {isSelf ? (
+            <span
+              className={`mt-1 inline-flex w-fit rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                account.role === "admin" ? "bg-brand-light text-brand" : "bg-black/5 text-black/50"
+              }`}
+            >
+              {account.role === "admin" ? "Admin" : "User"}
+            </span>
+          ) : (
+            <select
+              value={account.role}
+              disabled={isUpdatingRole}
+              onChange={(e) => handleRoleChange(e.target.value as Role)}
+              className="mt-1 rounded border border-black/15 bg-white px-1.5 py-0.5 text-[11px] disabled:opacity-50"
+            >
+              <option value="user">User</option>
+              <option value="admin">Admin</option>
+            </select>
+          )}
+          {roleError && <p className="mt-1 text-xs text-red-600">{roleError}</p>}
         </div>
         <div className="flex flex-none items-center gap-1">
           <button

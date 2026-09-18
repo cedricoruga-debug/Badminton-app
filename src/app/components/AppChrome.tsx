@@ -15,9 +15,11 @@ const APP_TITLE = "Queuing App by Ced";
  */
 export function AppChrome({
   settings,
+  isAdmin,
   children,
 }: {
   settings: AppSettings | null;
+  isAdmin: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -43,7 +45,7 @@ export function AppChrome({
         {/* pb-20 clears the fixed bottom nav bar on mobile; not needed once
          * that bar disappears in favor of the desktop side rail at md. */}
         <div className="min-w-0 flex-1 pb-20 landscape:pb-0">{children}</div>
-        <SidePanel settings={settings} />
+        <SidePanel settings={settings} isAdmin={isAdmin} />
       </div>
     </div>
   );
