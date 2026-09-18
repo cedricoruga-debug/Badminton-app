@@ -81,11 +81,10 @@ export default async function Home() {
               <img
                 src={settings.payment_qr_url}
                 alt="Payment QR code"
-                width={200}
-                height={200}
-                className="h-auto w-full max-w-[180px] rounded"
+                width={400}
+                height={400}
+                className="h-auto w-full max-w-[360px] rounded"
               />
-              <p className="text-xs text-black/50">Transfer fees may apply.</p>
             </div>
           ) : (
             <div className="flex h-[140px] flex-col items-center justify-center gap-1 rounded border border-dashed border-black/15 px-3 text-center text-[11px] text-black/40">

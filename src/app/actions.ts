@@ -124,6 +124,25 @@ export async function cyclePaymentMethod(
 
   if (error) throw new Error(error.message);
   revalidatePath("/");
+  revalidatePath("/sessions");
+  revalidatePath("/player-sessions");
+}
+
+/** Retract a player's payment — sends them straight back to Unpaid so the
+ * "Mark paid" icons show up again (e.g. the wrong method was tapped by
+ * mistake, or the payment needs to be redone). */
+export async function unmarkPaid(playerSessionId: string) {
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("player_sessions")
+    .update({ payment_method: null })
+    .eq("id", playerSessionId);
+
+  if (error) throw new Error(error.message);
+  revalidatePath("/");
+  revalidatePath("/sessions");
+  revalidatePath("/player-sessions");
 }
 
 /** Mark a player's session as paid via a specific method (Cash or GCash). */
@@ -137,6 +156,8 @@ export async function markPaid(playerSessionId: string, method: "Cash" | "Gcash"
 
   if (error) throw new Error(error.message);
   revalidatePath("/");
+  revalidatePath("/sessions");
+  revalidatePath("/player-sessions");
 }
 
 /**

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { markPaid, removePlayerFromSession, setDoneForSession } from "@/app/actions";
+import { markPaid, removePlayerFromSession, setDoneForSession, unmarkPaid } from "@/app/actions";
 import { Modal } from "@/app/components/Modal";
 import { IconPeso, IconPhone, IconTrash } from "@/app/components/icons";
 import type { GameWithPlayers } from "@/lib/queries";
@@ -60,8 +60,12 @@ export function PlayerSessionRow({
           >
             <div className="min-w-0">
               <p className="truncate font-semibold">{ps.player.name}</p>
+              <p className="text-sm text-black/50">{ps.total_games}</p>
+            </div>
+
+            <div className="flex flex-none flex-col items-end gap-2">
+              <p className="font-semibold">₱{ps.payable.toFixed(2)}</p>
               <div className="flex items-center gap-2">
-                <p className="text-sm text-black/50">{ps.total_games}</p>
                 <button
                   type="button"
                   disabled={isPending}
@@ -82,93 +86,100 @@ export function PlayerSessionRow({
                 >
                   {ps.done_for_session ? "Done" : "Mark done"}
                 </button>
-              </div>
-            </div>
 
-            <div className="flex flex-none flex-col items-end gap-2">
-              <p className="font-semibold">₱{ps.payable.toFixed(2)}</p>
-              {ps.payment_method ? (
-                <span
-                  className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                    ps.payment_method === "Cash"
-                      ? "bg-green-100 text-green-700"
-                      : "bg-blue-100 text-blue-700"
-                  }`}
-                >
-                  {ps.payment_method === "Cash" ? (
-                    <IconPeso className="h-3 w-3" />
+                {ps.done_for_session &&
+                  (ps.payment_method ? (
+                    <button
+                      type="button"
+                      disabled={payPending}
+                      title={`Paid — ${
+                        ps.payment_method === "Cash" ? "Cash" : "GCash"
+                      } (click to mark as unpaid)`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        startPayTransition(() => unmarkPaid(ps.id));
+                      }}
+                      className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors disabled:opacity-50 ${
+                        ps.payment_method === "Cash"
+                          ? "bg-green-100 text-green-700 hover:bg-green-200"
+                          : "bg-blue-100 text-blue-700 hover:bg-blue-200"
+                      }`}
+                    >
+                      {ps.payment_method === "Cash" ? (
+                        <IconPeso className="h-3 w-3" />
+                      ) : (
+                        <IconPhone className="h-3 w-3" />
+                      )}
+                      {ps.payment_method === "Cash" ? "Cash" : "GCash"}
+                    </button>
                   ) : (
-                    <IconPhone className="h-3 w-3" />
-                  )}
-                  Paid — {ps.payment_method === "Cash" ? "Cash" : "GCash"}
-                </span>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <button
-                    disabled={payPending}
-                    title="Mark paid — Cash"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      startPayTransition(() => markPaid(ps.id, "Cash"));
-                    }}
-                    className="flex h-6 w-6 items-center justify-center rounded-full bg-green-100 text-green-700 transition-colors hover:bg-green-200 disabled:opacity-50"
-                  >
-                    <IconPeso className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    disabled={payPending}
-                    title="Mark paid — GCash"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      startPayTransition(() => markPaid(ps.id, "Gcash"));
-                    }}
-                    className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-blue-700 transition-colors hover:bg-blue-200 disabled:opacity-50"
-                  >
-                    <IconPhone className="h-3.5 w-3.5" />
-                  </button>
-
-                  {confirmingDelete ? (
-                    <div className="flex items-center gap-1">
+                    <>
                       <button
-                        type="button"
-                        disabled={isPending}
-                        title={`Remove ${ps.player.name} from this session`}
+                        disabled={payPending}
+                        title="Mark paid — Cash"
                         onClick={(e) => {
                           e.stopPropagation();
-                          startTransition(() => removePlayerFromSession(ps.id, ps.session_id));
+                          startPayTransition(() => markPaid(ps.id, "Cash"));
                         }}
-                        className="rounded bg-red-500 px-2 py-1 text-[10px] font-medium text-white transition-colors hover:bg-red-600 disabled:opacity-50"
+                        className="flex h-6 w-6 items-center justify-center rounded-full bg-green-100 text-green-700 transition-colors hover:bg-green-200 disabled:opacity-50"
                       >
-                        Remove
+                        <IconPeso className="h-3.5 w-3.5" />
                       </button>
                       <button
-                        type="button"
+                        disabled={payPending}
+                        title="Mark paid — GCash"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setConfirmingDelete(false);
+                          startPayTransition(() => markPaid(ps.id, "Gcash"));
                         }}
-                        className="rounded px-1.5 py-1 text-[10px] font-medium text-black/50 hover:bg-black/5"
+                        className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-blue-700 transition-colors hover:bg-blue-200 disabled:opacity-50"
                       >
-                        Cancel
+                        <IconPhone className="h-3.5 w-3.5" />
                       </button>
-                    </div>
-                  ) : (
+                    </>
+                  ))}
+
+                {confirmingDelete ? (
+                  <div className="flex items-center gap-1">
                     <button
                       type="button"
                       disabled={isPending}
-                      title="Remove from session"
-                      aria-label="Remove from session"
+                      title={`Remove ${ps.player.name} from this session`}
                       onClick={(e) => {
                         e.stopPropagation();
-                        setConfirmingDelete(true);
+                        startTransition(() => removePlayerFromSession(ps.id, ps.session_id));
                       }}
-                      className="flex h-6 w-6 items-center justify-center rounded-full bg-red-50 text-red-500 transition-colors hover:bg-red-100 disabled:opacity-50"
+                      className="rounded bg-red-500 px-2 py-1 text-[10px] font-medium text-white transition-colors hover:bg-red-600 disabled:opacity-50"
                     >
-                      <IconTrash className="h-3.5 w-3.5" />
+                      Remove
                     </button>
-                  )}
-                </div>
-              )}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setConfirmingDelete(false);
+                      }}
+                      className="rounded px-1.5 py-1 text-[10px] font-medium text-black/50 hover:bg-black/5"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={isPending}
+                    title="Remove from session"
+                    aria-label="Remove from session"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setConfirmingDelete(true);
+                    }}
+                    className="flex h-6 w-6 items-center justify-center rounded-full bg-red-50 text-red-500 transition-colors hover:bg-red-100 disabled:opacity-50"
+                  >
+                    <IconTrash className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -187,43 +198,72 @@ export function PlayerSessionRow({
             </dl>
 
             <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-black/40">Payment</p>
-              {ps.payment_method ? (
-                <span
-                  className={`flex w-fit items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
-                    ps.payment_method === "Cash"
-                      ? "bg-green-100 text-green-700"
-                      : "bg-blue-100 text-blue-700"
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wide text-black/40">Payment</p>
+                <button
+                  type="button"
+                  disabled={isPending}
+                  title={
+                    ps.done_for_session
+                      ? "Done for this session — click to make active again"
+                      : "Mark done for this session (hides them from the New Game picker)"
+                  }
+                  onClick={() => startTransition(() => setDoneForSession(ps.id, !ps.done_for_session))}
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors disabled:opacity-50 ${
+                    ps.done_for_session
+                      ? "bg-green-100 text-green-700 hover:bg-green-200"
+                      : "bg-black/5 text-black/40 hover:bg-black/10"
                   }`}
                 >
-                  {ps.payment_method === "Cash" ? (
-                    <IconPeso className="h-3.5 w-3.5" />
-                  ) : (
-                    <IconPhone className="h-3.5 w-3.5" />
-                  )}
-                  Paid — {ps.payment_method === "Cash" ? "Cash" : "GCash"}
-                </span>
+                  {ps.done_for_session ? "Done" : "Mark done"}
+                </button>
+              </div>
+              {ps.done_for_session ? (
+                ps.payment_method ? (
+                  <button
+                    type="button"
+                    disabled={payPending}
+                    title="Click to mark as unpaid"
+                    onClick={() => startPayTransition(() => unmarkPaid(ps.id))}
+                    className={`flex w-fit items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
+                      ps.payment_method === "Cash"
+                        ? "bg-green-100 text-green-700 hover:bg-green-200"
+                        : "bg-blue-100 text-blue-700 hover:bg-blue-200"
+                    }`}
+                  >
+                    {ps.payment_method === "Cash" ? (
+                      <IconPeso className="h-3.5 w-3.5" />
+                    ) : (
+                      <IconPhone className="h-3.5 w-3.5" />
+                    )}
+                    Paid — {ps.payment_method === "Cash" ? "Cash" : "GCash"}
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={payPending}
+                      onClick={() => startPayTransition(() => markPaid(ps.id, "Cash"))}
+                      className="flex items-center gap-1.5 rounded-full bg-green-100 px-3 py-1.5 text-xs font-medium text-green-700 transition-colors hover:bg-green-200 disabled:opacity-50"
+                    >
+                      <IconPeso className="h-3.5 w-3.5" />
+                      Mark paid — Cash
+                    </button>
+                    <button
+                      type="button"
+                      disabled={payPending}
+                      onClick={() => startPayTransition(() => markPaid(ps.id, "Gcash"))}
+                      className="flex items-center gap-1.5 rounded-full bg-blue-100 px-3 py-1.5 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-200 disabled:opacity-50"
+                    >
+                      <IconPhone className="h-3.5 w-3.5" />
+                      Mark paid — GCash
+                    </button>
+                  </div>
+                )
               ) : (
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    disabled={payPending}
-                    onClick={() => startPayTransition(() => markPaid(ps.id, "Cash"))}
-                    className="flex items-center gap-1.5 rounded-full bg-green-100 px-3 py-1.5 text-xs font-medium text-green-700 transition-colors hover:bg-green-200 disabled:opacity-50"
-                  >
-                    <IconPeso className="h-3.5 w-3.5" />
-                    Mark paid — Cash
-                  </button>
-                  <button
-                    type="button"
-                    disabled={payPending}
-                    onClick={() => startPayTransition(() => markPaid(ps.id, "Gcash"))}
-                    className="flex items-center gap-1.5 rounded-full bg-blue-100 px-3 py-1.5 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-200 disabled:opacity-50"
-                  >
-                    <IconPhone className="h-3.5 w-3.5" />
-                    Mark paid — GCash
-                  </button>
-                </div>
+                <p className="text-sm text-black/40">
+                  Mark this player done for the session to record payment.
+                </p>
               )}
             </div>
 
