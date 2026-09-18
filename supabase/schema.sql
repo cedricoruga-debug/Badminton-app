@@ -171,6 +171,43 @@ create policy "Require login" on player_sessions for all using (auth.uid() is no
 create policy "Require login" on app_settings for all using (auth.uid() is not null) with check (auth.uid() is not null);
 
 -- ---------------------------------------------------------------------------
+-- Realtime
+-- Lets every open tab/device pick up a change (add/edit/delete) the moment
+-- it happens anywhere else, instead of needing a manual refresh. See
+-- enable_realtime.sql for the standalone version of this block (run that
+-- one instead if you're applying this to an existing live database).
+-- ---------------------------------------------------------------------------
+do $$
+begin
+  alter publication supabase_realtime add table players;
+exception when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  alter publication supabase_realtime add table sessions;
+exception when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  alter publication supabase_realtime add table games;
+exception when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  alter publication supabase_realtime add table player_sessions;
+exception when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  alter publication supabase_realtime add table app_settings;
+exception when duplicate_object then null;
+end $$;
+
+-- ---------------------------------------------------------------------------
 -- storage   (uploaded images — the app icon and the payment QR code, set
 -- from the app's Settings popup instead of pasting a URL by hand)
 -- One public bucket. Reads stay public (so <img src="..."> tags just work

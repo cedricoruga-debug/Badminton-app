@@ -60,3 +60,9 @@ where email = 'ced@badminton.local';
 ```
 
 (swap `ced@badminton.local` for whichever username you used in step 1, if different). After that, sign out and back in — every account created or promoted from then on is handled entirely from the Accounts page, no more SQL needed.
+
+## 6. Live updates across devices
+
+Open your Supabase project → **SQL Editor** → paste in the contents of `supabase/enable_realtime.sql` from this repo → **Run**. This is a one-time step (it's already baked into `schema.sql` for anyone setting up a brand-new database, but an existing one needs it run separately).
+
+Without this, the app still works fine — it just won't pick up a change made on another device until you manually refresh (or switch away from the tab and back). With it, every open tab/device sees an add, edit, or delete the moment it happens anywhere else — no refresh needed.
