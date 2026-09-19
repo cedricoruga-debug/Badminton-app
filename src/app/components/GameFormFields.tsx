@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { deleteGame } from "@/app/actions";
-import { PlayerHistoryButton } from "@/app/components/PlayerHistoryButton";
+import { PlayerHistoryPanel } from "@/app/components/PlayerHistoryPanel";
 import { SubmitButton } from "@/app/components/SubmitButton";
 import type { Game, PlayerSessionWithPlayer } from "@/lib/types";
 
@@ -93,9 +94,8 @@ export function GameFormFields({
     return status;
   }, [games, gameId]);
 
-  // player_id -> name, for the "who's played with who" preview below —
-  // PlayerHistoryButton only has ids on each game row, this fills in the
-  // names for the other 3 slots.
+  // player_id -> name, for the game-history panels below — each game row on
+  // `games` only has ids, this fills in the names for the other 3 slots.
   const nameById = useMemo(() => new Map(players.map((ps) => [ps.player.id, ps.player.name])), [players]);
 
   function toggle(playerId: string) {
@@ -115,7 +115,8 @@ export function GameFormFields({
   }
 
   return (
-    <form action={action} className="space-y-6">
+    <>
+      <form action={action} className="space-y-6">
       {gameId && <input type="hidden" name="game_id" value={gameId} />}
       {redirectTo && <input type="hidden" name="redirect_to" value={redirectTo} />}
 
@@ -211,25 +212,6 @@ export function GameFormFields({
         )}
       </fieldset>
 
-      {games.length > 0 && players.length > 0 && (
-        <div>
-          <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-black/30">
-            Who&apos;s played with who — tap a name
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {players.map((ps) => (
-              <PlayerHistoryButton
-                key={ps.player.id}
-                playerId={ps.player.id}
-                playerName={ps.player.name}
-                games={games}
-                nameById={nameById}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
       <div className="flex items-center justify-between border-t border-black/10 pt-4">
         <div>
           {gameId &&
@@ -280,7 +262,33 @@ export function GameFormFields({
           </SubmitButton>
         </div>
       </div>
-    </form>
+      </form>
+
+      {/* One small floating card per currently-picked player, portaled to
+       * the very bottom of the page (below the modal, not inside it) so
+       * picking someone immediately shows "have they already played with X
+       * today" without an extra click or leaving the form. */}
+      {selected.length > 0 &&
+        createPortal(
+          <div className="pointer-events-none fixed inset-x-0 bottom-4 z-[60] flex flex-col items-center gap-2 px-4">
+            {selected.map((playerId) => {
+              const ps = players.find((p) => p.player.id === playerId);
+              if (!ps) return null;
+              return (
+                <div key={playerId} className="pointer-events-auto">
+                  <PlayerHistoryPanel
+                    playerId={playerId}
+                    playerName={ps.player.name}
+                    games={games}
+                    nameById={nameById}
+                  />
+                </div>
+              );
+            })}
+          </div>,
+          document.body
+        )}
+    </>
   );
 }
 
