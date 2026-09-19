@@ -79,13 +79,17 @@ export function GameRow({
                   <button
                     type="button"
                     disabled={isPending}
+                    title={game.status === "Queued" ? "Start this game" : "Mark this game done"}
                     onClick={(e) => {
                       e.stopPropagation();
                       startTransition(() => advanceGameStatus(game.id, game.status));
                     }}
                     className="whitespace-nowrap rounded border border-brand/30 px-2 py-1 text-[11px] font-medium text-brand transition-colors hover:bg-brand-light disabled:opacity-50"
                   >
-                    Move forward →
+                    {/* Says what tapping it actually does next, instead of
+                     * the generic "Move forward" — same wording style as
+                     * the court boxes' "Ongoing — mark done" button. */}
+                    {game.status === "Queued" ? "Start game →" : "Mark done ✓"}
                   </button>
                 )}
               </div>
