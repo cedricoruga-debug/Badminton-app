@@ -26,7 +26,7 @@ export function PlayerHistoryPanel({
   /** player_id -> display name, for the other names in each listed game. */
   nameById: Map<string, string>;
 }) {
-  const playedGames = games
+  const allPlayedGames = games
     .filter(
       (g) =>
         g.status !== "Queued" &&
@@ -34,13 +34,25 @@ export function PlayerHistoryPanel({
     )
     .sort((a, b) => a.game_number - b.game_number);
 
+  // A quick glance, not a scrollable log — show only the most recent few so
+  // the whole card is visible at once with no scrolling required. Older
+  // games are summarized as a count rather than hidden behind a scrollbar.
+  const MAX_SHOWN = 3;
+  const playedGames = allPlayedGames.slice(-MAX_SHOWN);
+  const olderCount = allPlayedGames.length - playedGames.length;
+
   return (
     <div className="w-60 flex-none rounded-lg border border-black/10 bg-white p-2.5 shadow-lg">
       <p className="mb-1.5 truncate text-xs font-semibold text-brand">{playerName}&apos;s games</p>
       {playedGames.length === 0 ? (
         <p className="text-xs text-black/40">Hasn&apos;t played yet today.</p>
       ) : (
-        <ul className="max-h-28 space-y-1 overflow-y-auto pr-0.5">
+        <ul className="space-y-1">
+          {olderCount > 0 && (
+            <li className="text-[10px] text-black/35">
+              +{olderCount} earlier game{olderCount === 1 ? "" : "s"}
+            </li>
+          )}
           {playedGames.map((g) => {
             // Same "A / B / C / D" format as the Games played list in a
             // player's own popup on the Players grid — all 4 slots, this
