@@ -144,47 +144,11 @@ export function PlayerSessionRow({
                     </>
                   )
                 )}
-
-                {confirmingDelete ? (
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      disabled={isPending}
-                      title={`Remove ${ps.player.name} from this session`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        startTransition(() => removePlayerFromSession(ps.id, ps.session_id));
-                      }}
-                      className="rounded bg-red-500 px-2 py-1 text-[10px] font-medium text-white transition-colors hover:bg-red-600 disabled:opacity-50"
-                    >
-                      Remove
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setConfirmingDelete(false);
-                      }}
-                      className="rounded px-1.5 py-1 text-[10px] font-medium text-black/50 hover:bg-black/5"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    disabled={isPending}
-                    title="Remove from session"
-                    aria-label="Remove from session"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setConfirmingDelete(true);
-                    }}
-                    className="flex h-6 w-6 items-center justify-center rounded-full bg-red-50 text-red-500 transition-colors hover:bg-red-100 disabled:opacity-50"
-                  >
-                    <IconTrash className="h-3.5 w-3.5" />
-                  </button>
-                )}
+                {/* Delete is deliberately not exposed here in the compact
+                 * row — it's one tap away from "Mark done"/payment buttons,
+                 * too easy to hit by accident. It's still available inside
+                 * the popup (click the player) via "Remove from session"
+                 * below. */}
               </div>
             </div>
           </div>
