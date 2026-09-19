@@ -45,6 +45,19 @@ export default async function Home() {
   const ongoingGames = queuedGames.filter((g) => g.status === "Ongoing");
   const notStartedGames = queuedGames.filter((g) => g.status !== "Ongoing");
 
+  // A few extra numbers for the Details panel below the QR code — all
+  // derived from sessionPlayers, already fetched above, no extra queries.
+  const totalPlayers = sessionPlayers.length;
+  const paidPlayersCount = sessionPlayers.filter((ps) => ps.payment_method !== null).length;
+  const mostGamesPlayed = sessionPlayers.reduce((max, ps) => Math.max(max, ps.total_games), 0);
+  const mvpNames =
+    mostGamesPlayed > 0
+      ? sessionPlayers
+          .filter((ps) => ps.total_games === mostGamesPlayed)
+          .map((ps) => ps.player.name)
+          .join(" & ")
+      : null;
+
   // The 4 shortcut buttons — rendered twice below (once for the portrait
   // static top bar, once back in their original spot at the bottom of the
   // QR panel for landscape/desktop), CSS-toggled so only one is visible at
@@ -201,6 +214,33 @@ export default async function Home() {
             <div className="flex justify-between">
               <dt className="text-black/50">Total games</dt>
               <dd className="font-medium">{totalGameCount}</dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-black/50">Total players</dt>
+              <dd className="font-medium">{totalPlayers}</dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-black/50">Paid</dt>
+              <dd
+                className={`font-medium ${
+                  totalPlayers > 0 && paidPlayersCount === totalPlayers ? "text-green-700" : ""
+                }`}
+              >
+                {totalPlayers > 0 ? `${paidPlayersCount}/${totalPlayers}` : "—"}
+              </dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-black/50">Today&apos;s MVP</dt>
+              <dd className="flex items-center gap-1 font-medium">
+                {mvpNames ? (
+                  <>
+                    <IconTrophy className="h-3.5 w-3.5 flex-none text-amber-500" />
+                    <span className="truncate">{mvpNames}</span>
+                  </>
+                ) : (
+                  "—"
+                )}
+              </dd>
             </div>
           </dl>
         </section>
