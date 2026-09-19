@@ -95,14 +95,14 @@ export default async function Home() {
         </div>
       </div>
 
-      <main className="flex flex-1 flex-col gap-4 px-4 pb-4 pt-4 landscape:grid landscape:min-h-0 landscape:grid-cols-[0.75fr_1.8fr_0.8fr]">
+      <main className="flex flex-1 flex-col gap-4 px-4 pb-4 pt-4 landscape:grid landscape:min-h-0 landscape:grid-cols-[0.5fr_1.8fr_0.8fr]">
         {/* Games Queued — what's left to play this session. Stays first in
          * the markup (so portrait/mobile shows it on top, per an earlier
          * request), but in landscape/desktop it's reordered back to the
          * middle/widest column via `order`, with Players back in the first
          * (narrower) column — the original desktop arrangement. Players'
-         * column is 0.75fr (was 1fr) so it renders narrower than the other
-         * two columns. */}
+         * column is 0.5fr (was 1fr, then 0.75fr) so it renders noticeably
+         * narrower than the other two columns. */}
         <section className="flex min-h-0 min-w-0 flex-col rounded-xl bg-white p-4 shadow-sm landscape:order-2 landscape:h-full">
           <h3 className="mb-3 flex-none font-semibold">Games Queued</h3>
           <ul className="max-h-96 overflow-x-hidden overflow-y-auto landscape:min-h-0 landscape:max-h-none landscape:flex-1">
