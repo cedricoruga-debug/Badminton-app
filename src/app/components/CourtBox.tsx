@@ -54,12 +54,14 @@ export function CourtBox({
           }}
           className="flex cursor-pointer flex-col overflow-hidden rounded-xl shadow-sm ring-1 ring-black/10 transition-transform hover:-translate-y-0.5"
         >
-          <p className="flex-none truncate bg-black/80 px-1.5 py-1 text-center text-[10px] font-semibold text-white">
+          <p className="flex-none truncate bg-black/80 px-1.5 py-1.5 text-center text-xs font-semibold text-white">
             Game {game.game_number}
           </p>
 
-          {/* The court: two halves split by the net, 2 players a side. */}
-          <div className="flex min-h-[84px] flex-1 flex-col bg-emerald-600">
+          {/* The court: two halves split by the net, 2 players a side. Taller
+           * than it is wide, like a real court, with room for the name to
+           * wrap to a second line rather than truncate. */}
+          <div className="flex min-h-[220px] flex-1 flex-col bg-emerald-600">
             <div className="grid flex-1 grid-cols-2 divide-x divide-white/40 border-b-[3px] border-white/90">
               <PlayerCell name={game.player1?.name} />
               <PlayerCell name={game.player2?.name} />
@@ -78,7 +80,7 @@ export function CourtBox({
               e.stopPropagation();
               startTransition(() => advanceGameStatus(game.id, game.status));
             }}
-            className="flex-none bg-amber-400 px-1.5 py-1 text-center text-[10px] font-semibold text-amber-900 transition-colors hover:bg-amber-300 disabled:opacity-50"
+            className="flex-none bg-amber-400 px-1.5 py-1.5 text-center text-xs font-semibold text-amber-900 transition-colors hover:bg-amber-300 disabled:opacity-50"
           >
             Ongoing — mark done
           </button>
@@ -90,8 +92,8 @@ export function CourtBox({
 
 function PlayerCell({ name }: { name?: string | null }) {
   return (
-    <div className="flex min-w-0 items-center justify-center px-1 py-1.5 text-center">
-      <span className="truncate text-[10px] font-semibold leading-tight text-white">{name ?? "—"}</span>
+    <div className="flex min-w-0 items-center justify-center px-1.5 py-2 text-center">
+      <span className="break-words text-base font-bold leading-tight text-white">{name ?? "—"}</span>
     </div>
   );
 }
