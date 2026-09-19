@@ -267,10 +267,13 @@ export function GameFormFields({
       {/* One small floating card per currently-picked player, portaled to
        * the very bottom of the page (below the modal, not inside it) so
        * picking someone immediately shows "have they already played with X
-       * today" without an extra click or leaving the form. */}
+       * today" without an extra click or leaving the form. Laid out in a
+       * row (wrapping if it doesn't fit) rather than stacked, so a full
+       * 4-player pick stays a short strip under the modal instead of a tall
+       * column tall enough to cover it. */}
       {selected.length > 0 &&
         createPortal(
-          <div className="pointer-events-none fixed inset-x-0 bottom-4 z-[60] flex flex-col items-center gap-2 px-4">
+          <div className="pointer-events-none fixed inset-x-0 bottom-3 z-[60] flex flex-row flex-wrap items-start justify-center gap-2 px-4">
             {selected.map((playerId) => {
               const ps = players.find((p) => p.player.id === playerId);
               if (!ps) return null;
