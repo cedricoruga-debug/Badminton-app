@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { deleteGame } from "@/app/actions";
+import { PlayerHistoryButton } from "@/app/components/PlayerHistoryButton";
 import { SubmitButton } from "@/app/components/SubmitButton";
 import type { Game, PlayerSessionWithPlayer } from "@/lib/types";
 
@@ -13,7 +14,7 @@ const STATUSES: Array<{ value: "Queued" | "Ongoing" | "Done"; label: string }> =
   { value: "Done", label: "Done" },
 ];
 
-type GameForStatus = Pick<Game, "id" | "status" | "player1_id" | "player2_id" | "player3_id" | "player4_id">;
+type GameForStatus = Pick<Game, "id" | "game_number" | "status" | "player1_id" | "player2_id" | "player3_id" | "player4_id">;
 
 /** Subtle badge colors for a player's current standing this session — kept
  * light (pale background, matching-tone border/text) so the name stays easy
@@ -91,6 +92,11 @@ export function GameFormFields({
     }
     return status;
   }, [games, gameId]);
+
+  // player_id -> name, for the "who's played with who" preview below —
+  // PlayerHistoryButton only has ids on each game row, this fills in the
+  // names for the other 3 slots.
+  const nameById = useMemo(() => new Map(players.map((ps) => [ps.player.id, ps.player.name])), [players]);
 
   function toggle(playerId: string) {
     setSelected((prev) => {
@@ -204,6 +210,25 @@ export function GameFormFields({
           </div>
         )}
       </fieldset>
+
+      {games.length > 0 && players.length > 0 && (
+        <div>
+          <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-black/30">
+            Who&apos;s played with who — tap a name
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {players.map((ps) => (
+              <PlayerHistoryButton
+                key={ps.player.id}
+                playerId={ps.player.id}
+                playerName={ps.player.name}
+                games={games}
+                nameById={nameById}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="flex items-center justify-between border-t border-black/10 pt-4">
         <div>

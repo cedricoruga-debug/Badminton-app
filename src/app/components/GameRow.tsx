@@ -8,7 +8,7 @@ import type { GameWithPlayers } from "@/lib/queries";
 import type { Game, PlayerSessionWithPlayer } from "@/lib/types";
 
 type SessionOption = { id: string; session_date: string };
-type GameForStatus = Pick<Game, "id" | "status" | "player1_id" | "player2_id" | "player3_id" | "player4_id">;
+type GameForStatus = Pick<Game, "id" | "game_number" | "status" | "player1_id" | "player2_id" | "player3_id" | "player4_id">;
 
 const STATUS_STYLES: Record<string, string> = {
   Queued: "bg-brand-light text-brand",
