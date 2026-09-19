@@ -26,7 +26,7 @@ export function PlayerHistoryPanel({
   /** player_id -> display name, for the other names in each listed game. */
   nameById: Map<string, string>;
 }) {
-  const allPlayedGames = games
+  const playedGames = games
     .filter(
       (g) =>
         g.status !== "Queued" &&
@@ -34,50 +34,37 @@ export function PlayerHistoryPanel({
     )
     .sort((a, b) => a.game_number - b.game_number);
 
-  // A quick glance, not a scrollable log — show only the most recent few so
-  // the whole card is visible at once with no scrolling required. Older
-  // games are summarized as a count rather than hidden behind a scrollbar.
-  const MAX_SHOWN = 3;
-  const playedGames = allPlayedGames.slice(-MAX_SHOWN);
-  const olderCount = allPlayedGames.length - playedGames.length;
-
   return (
-    <div className="w-60 flex-none rounded-lg border border-black/10 bg-white p-2.5 shadow-lg">
+    <div className="w-64 flex-none rounded-lg border border-black/10 bg-white p-2.5 shadow-lg">
       <p className="mb-1.5 truncate text-xs font-semibold text-brand">{playerName}&apos;s games</p>
       {playedGames.length === 0 ? (
         <p className="text-xs text-black/40">Hasn&apos;t played yet today.</p>
       ) : (
-        <ul className="space-y-1">
-          {olderCount > 0 && (
-            <li className="text-[10px] text-black/35">
-              +{olderCount} earlier game{olderCount === 1 ? "" : "s"}
-            </li>
-          )}
+        // Every game as one compact row (game #, "A / B / C / D" roster, a
+        // status dot) rather than a two-line card per game, so the whole
+        // session's history fits at a glance with no cap and no scrolling.
+        <ul className="space-y-0.5">
           {playedGames.map((g) => {
             // Same "A / B / C / D" format as the Games played list in a
             // player's own popup on the Players grid — all 4 slots, this
-            // player included, slash-separated. Full names, no truncation —
-            // this card is wide enough and wraps onto a second line rather
-            // than clipping, so every player is actually legible.
+            // player included, slash-separated.
             const names = [g.player1_id, g.player2_id, g.player3_id, g.player4_id]
               .map((id) => (id ? nameById.get(id) ?? "—" : "—"))
               .join(" / ");
             return (
               <li
                 key={g.id}
-                className="rounded bg-black/[0.03] px-2 py-1 text-xs leading-snug"
+                className="flex items-center gap-1.5 rounded bg-black/[0.03] px-1.5 py-1 text-[11px] leading-none"
+                title={`Game ${g.game_number} — ${names} (${g.status})`}
               >
-                <div className="mb-0.5 flex items-center justify-between gap-1">
-                  <span className="text-[10px] font-medium text-black/40">Game {g.game_number}</span>
-                  <span
-                    className={`flex-none rounded-full px-1.5 py-px text-[9px] font-medium ${
-                      g.status === "Done" ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"
-                    }`}
-                  >
-                    {g.status}
-                  </span>
-                </div>
-                <div className="break-words text-black/80">{names}</div>
+                <span className="flex-none font-medium text-black/40">G{g.game_number}</span>
+                <span className="min-w-0 flex-1 truncate text-black/80">{names}</span>
+                <span
+                  aria-label={g.status}
+                  className={`h-1.5 w-1.5 flex-none rounded-full ${
+                    g.status === "Done" ? "bg-green-500" : "bg-amber-500"
+                  }`}
+                />
               </li>
             );
           })}
