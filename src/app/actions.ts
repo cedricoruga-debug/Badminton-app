@@ -6,12 +6,17 @@ import { currentUserRole } from "@/lib/accounts";
 import { createClient } from "@/lib/supabase/server";
 
 /**
- * Recompute total_games and shuttle_share for every player registered in a
- * session, counting only games that have actually been played — status
- * "Ongoing" or "Done" ("Queued" doesn't count yet). Derived fresh from the
- * games table every time (rather than kept as an incrementing counter) so
- * it can never drift out of sync with what actually happened: creating,
- * editing, deleting a game, or moving its status all funnel through this.
+ * Recompute total_games, court_share and shuttle_share for every player
+ * registered in a session — counting only games that have actually been
+ * played (status "Ongoing" or "Done"; "Queued" doesn't count yet), and
+ * pulling court_share_per_player / shuttle_fee_per_game fresh from the
+ * session every time. Derived fresh rather than kept as running totals so
+ * none of it can drift out of sync with what's actually true: creating,
+ * editing, deleting a game, or moving its status all funnel through this —
+ * and so does editing the session's own cost inputs (hours, fee/hour,
+ * shuttle tube cost) via updateSession, since those change
+ * court_share_per_player and shuttle_fee_per_game without touching a game
+ * at all.
  *
  * total_games then feeds shuttle_share (total_games * shuttle_fee_per_game),
  * and payable is a generated column off (court_share + shuttle_share) —
@@ -36,7 +41,11 @@ async function recomputePlayerGameCounts(
       .select("player1_id, player2_id, player3_id, player4_id")
       .eq("session_id", sessionId)
       .in("status", ["Ongoing", "Done"]),
-    supabase.from("sessions").select("shuttle_fee_per_game").eq("id", sessionId).single(),
+    supabase
+      .from("sessions")
+      .select("court_share_per_player, shuttle_fee_per_game")
+      .eq("id", sessionId)
+      .single(),
     supabase.from("player_sessions").select("id, player_id").eq("session_id", sessionId),
   ]);
   if (gamesError) throw new Error(gamesError.message);
@@ -50,6 +59,7 @@ async function recomputePlayerGameCounts(
     }
   }
 
+  const courtSharePerPlayer = session.court_share_per_player;
   const shuttleFeePerGame = session.shuttle_fee_per_game;
 
   // One request updating every player_session row at once, instead of one
@@ -68,6 +78,7 @@ async function recomputePlayerGameCounts(
         session_id: sessionId,
         player_id: ps.player_id,
         total_games: totalGames,
+        court_share: courtSharePerPlayer,
         shuttle_share: totalGames * shuttleFeePerGame,
       };
     });
@@ -462,6 +473,15 @@ export async function updateSession(formData: FormData) {
     .eq("id", sessionId);
 
   if (error) throw new Error(error.message);
+
+  // hours/fee_per_hour/shuttle_tube_cost feed the session's own
+  // court_share_per_player and shuttle_fee_per_game (generated columns),
+  // but each player's stored court_share/shuttle_share — and so their
+  // generated `payable` — don't follow along on their own. Without this,
+  // editing a session's cost inputs silently leaves everyone's amount due
+  // stuck at whatever it was before the edit.
+  await recomputePlayerGameCounts(supabase, sessionId);
+
   revalidatePath("/");
   revalidatePath("/sessions");
   redirect(`/sessions?session=${sessionId}`);
