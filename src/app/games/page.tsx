@@ -78,6 +78,7 @@ export default async function GamesPage(props: PageProps<"/games">) {
                   sessionId={selectedSessionId}
                   sessions={sessionOptions}
                   players={selectedPlayers.filter((ps) => !ps.done_for_session)}
+                  games={selectedGames}
                   nextGameNumber={selectedGames.length + 1}
                   redirectTo={`/games?session=${selectedSessionId}`}
                   variant="icon"
@@ -90,7 +91,13 @@ export default async function GamesPage(props: PageProps<"/games">) {
               ) : (
                 <ul>
                   {selectedGames.map((g) => (
-                    <GameRow key={g.id} game={g} sessions={sessionOptions} players={selectedPlayers} />
+                    <GameRow
+                      key={g.id}
+                      game={g}
+                      sessions={sessionOptions}
+                      players={selectedPlayers}
+                      games={selectedGames}
+                    />
                   ))}
                 </ul>
               )}

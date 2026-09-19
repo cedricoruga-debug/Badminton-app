@@ -66,6 +66,7 @@ export default async function Home() {
           sessionId={session.id}
           sessions={sessions}
           players={sessionPlayers.filter((ps) => !ps.done_for_session)}
+          games={allSessionGames}
           nextGameNumber={totalGameCount + 1}
         />
       ) : (
@@ -117,7 +118,13 @@ export default async function Home() {
           {ongoingGames.length > 0 && (
             <div className="mb-3 grid flex-none grid-cols-4 gap-2">
               {ongoingGames.map((g) => (
-                <CourtBox key={g.id} game={g} sessions={sessions} players={sessionPlayers} />
+                <CourtBox
+                  key={g.id}
+                  game={g}
+                  sessions={sessions}
+                  players={sessionPlayers}
+                  games={allSessionGames}
+                />
               ))}
             </div>
           )}
@@ -131,7 +138,13 @@ export default async function Home() {
               </li>
             ) : (
               notStartedGames.map((g) => (
-                <GameRow key={g.id} game={g} sessions={sessions} players={sessionPlayers} />
+                <GameRow
+                  key={g.id}
+                  game={g}
+                  sessions={sessions}
+                  players={sessionPlayers}
+                  games={allSessionGames}
+                />
               ))
             )}
           </ul>

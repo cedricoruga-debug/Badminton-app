@@ -4,9 +4,10 @@ import { useTransition } from "react";
 import { advanceGameStatus } from "@/app/actions";
 import { EditGameButton } from "@/app/components/EditGameButton";
 import type { GameWithPlayers } from "@/lib/queries";
-import type { PlayerSessionWithPlayer } from "@/lib/types";
+import type { Game, PlayerSessionWithPlayer } from "@/lib/types";
 
 type SessionOption = { id: string; session_date: string };
+type GameForStatus = Pick<Game, "id" | "status" | "player1_id" | "player2_id" | "player3_id" | "player4_id">;
 
 /**
  * An Ongoing game, drawn as a little badminton court instead of a plain
@@ -26,15 +27,20 @@ export function CourtBox({
   game,
   sessions,
   players,
+  games = [],
 }: {
   game: GameWithPlayers;
   sessions: SessionOption[];
   players: PlayerSessionWithPlayer[];
+  /** Every other game in this session — colors the edit popup's player
+   * picker by who's free, queued, or currently playing. See
+   * GameFormFields. */
+  games?: GameForStatus[];
 }) {
   const [isPending, startTransition] = useTransition();
 
   return (
-    <EditGameButton game={game} sessions={sessions} players={players}>
+    <EditGameButton game={game} sessions={sessions} players={players} games={games}>
       {(open) => (
         <div
           role="button"

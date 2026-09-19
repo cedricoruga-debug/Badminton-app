@@ -5,9 +5,10 @@ import { updateGame } from "@/app/actions";
 import { GameFormFields } from "@/app/components/GameFormFields";
 import { Modal } from "@/app/components/Modal";
 import type { GameWithPlayers } from "@/lib/queries";
-import type { PlayerSessionWithPlayer } from "@/lib/types";
+import type { Game, PlayerSessionWithPlayer } from "@/lib/types";
 
 type SessionOption = { id: string; session_date: string };
+type GameForStatus = Pick<Game, "id" | "status" | "player1_id" | "player2_id" | "player3_id" | "player4_id">;
 
 /**
  * Wraps a game in an edit popup. `children` renders the trigger — the
@@ -18,11 +19,15 @@ export function EditGameButton({
   game,
   sessions,
   players,
+  games = [],
   children,
 }: {
   game: GameWithPlayers;
   sessions: SessionOption[];
   players: PlayerSessionWithPlayer[];
+  /** Every other game in this session — colors the player picker by who's
+   * free, queued, or currently playing. See GameFormFields. */
+  games?: GameForStatus[];
   children: (open: () => void) => ReactNode;
 }) {
   const defaultPlayerIds = [game.player1_id, game.player2_id, game.player3_id, game.player4_id].filter(
@@ -39,6 +44,7 @@ export function EditGameButton({
           sessions={sessions}
           defaultSessionId={game.session_id}
           players={players}
+          games={games}
           defaultStatus={game.status}
           defaultPlayerIds={defaultPlayerIds}
           submitLabel="Save changes"

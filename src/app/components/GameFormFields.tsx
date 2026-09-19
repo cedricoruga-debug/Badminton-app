@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { deleteGame } from "@/app/actions";
 import { SubmitButton } from "@/app/components/SubmitButton";
-import type { PlayerSessionWithPlayer } from "@/lib/types";
+import type { Game, PlayerSessionWithPlayer } from "@/lib/types";
 
 type SessionOption = { id: string; session_date: string };
 
@@ -12,6 +12,17 @@ const STATUSES: Array<{ value: "Queued" | "Ongoing" | "Done"; label: string }> =
   { value: "Ongoing", label: "Ongoing" },
   { value: "Done", label: "Done" },
 ];
+
+type GameForStatus = Pick<Game, "id" | "status" | "player1_id" | "player2_id" | "player3_id" | "player4_id">;
+
+/** Subtle badge colors for a player's current standing this session — kept
+ * light (pale background, matching-tone border/text) so the name stays easy
+ * to read, not a solid color block. */
+const PICKER_STATUS_STYLES = {
+  free: "border-emerald-200 bg-emerald-50 text-emerald-800 hover:border-emerald-400",
+  queued: "border-amber-200 bg-amber-50 text-amber-800 hover:border-amber-400",
+  ongoing: "border-red-200 bg-red-50 text-red-800 hover:border-red-400",
+} as const;
 
 
 /**
@@ -27,6 +38,7 @@ export function GameFormFields({
   sessions,
   defaultSessionId,
   players,
+  games = [],
   defaultStatus = "Queued",
   defaultPlayerIds = [],
   submitLabel = "Save",
@@ -42,6 +54,11 @@ export function GameFormFields({
   sessions: SessionOption[];
   defaultSessionId: string;
   players: PlayerSessionWithPlayer[];
+  /** Every other game in this session (any status) — used only to color the
+   * player picker below by who's free, already queued elsewhere, or
+   * currently playing. Optional; with none given (or omitted) everyone just
+   * shows as free. */
+  games?: GameForStatus[];
   defaultStatus?: "Queued" | "Ongoing" | "Done";
   defaultPlayerIds?: string[];
   submitLabel?: string;
@@ -53,6 +70,27 @@ export function GameFormFields({
   const [selected, setSelected] = useState<string[]>(defaultPlayerIds);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [isDeleting, startDeleteTransition] = useTransition();
+
+  // Who's already spoken for this session, excluding this very game (its
+  // own roster shouldn't count as "already busy" — those players show as
+  // selected/checked instead, via `selected`). Ongoing always wins over
+  // Queued if a player somehow shows up in both.
+  const playerStatus = useMemo(() => {
+    const status = new Map<string, "queued" | "ongoing">();
+    for (const g of games) {
+      if (g.id === gameId || g.status !== "Queued") continue;
+      for (const pid of [g.player1_id, g.player2_id, g.player3_id, g.player4_id]) {
+        if (pid) status.set(pid, "queued");
+      }
+    }
+    for (const g of games) {
+      if (g.id === gameId || g.status !== "Ongoing") continue;
+      for (const pid of [g.player1_id, g.player2_id, g.player3_id, g.player4_id]) {
+        if (pid) status.set(pid, "ongoing");
+      }
+    }
+    return status;
+  }, [games, gameId]);
 
   function toggle(playerId: string) {
     setSelected((prev) => {
@@ -123,6 +161,13 @@ export function GameFormFields({
             {players.map((ps) => {
               const checked = selected.includes(ps.player.id);
               const disabled = !checked && selected.length >= 4;
+              const status = playerStatus.get(ps.player.id);
+              const statusClasses =
+                status === "ongoing"
+                  ? PICKER_STATUS_STYLES.ongoing
+                  : status === "queued"
+                    ? PICKER_STATUS_STYLES.queued
+                    : PICKER_STATUS_STYLES.free;
               return (
                 <label key={ps.player.id}>
                   <input
@@ -139,8 +184,8 @@ export function GameFormFields({
                       checked
                         ? "cursor-pointer border-brand bg-brand text-white"
                         : disabled
-                          ? "cursor-not-allowed border-black/10 text-black/30"
-                          : "cursor-pointer border-black/15 text-black/70 hover:border-brand/40"
+                          ? `cursor-not-allowed opacity-50 ${statusClasses}`
+                          : `cursor-pointer ${statusClasses}`
                     }`}
                   >
                     {ps.player.name}
@@ -149,6 +194,13 @@ export function GameFormFields({
                 </label>
               );
             })}
+          </div>
+        )}
+        {games.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-black/40">
+            <Legend swatch="bg-emerald-100 border-emerald-300" label="Not queued" />
+            <Legend swatch="bg-amber-100 border-amber-300" label="Queued" />
+            <Legend swatch="bg-red-100 border-red-300" label="Playing now" />
           </div>
         )}
       </fieldset>
@@ -204,5 +256,14 @@ export function GameFormFields({
         </div>
       </div>
     </form>
+  );
+}
+
+function Legend({ swatch, label }: { swatch: string; label: string }) {
+  return (
+    <span className="flex items-center gap-1">
+      <span className={`h-2.5 w-2.5 rounded-full border ${swatch}`} />
+      {label}
+    </span>
   );
 }

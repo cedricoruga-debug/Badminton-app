@@ -4,14 +4,16 @@ import { createGame } from "@/app/actions";
 import { GameFormFields } from "@/app/components/GameFormFields";
 import { Modal } from "@/app/components/Modal";
 import { IconPlus } from "@/app/components/icons";
-import type { PlayerSessionWithPlayer } from "@/lib/types";
+import type { Game, PlayerSessionWithPlayer } from "@/lib/types";
 
 type SessionOption = { id: string; session_date: string };
+type GameForStatus = Pick<Game, "id" | "status" | "player1_id" | "player2_id" | "player3_id" | "player4_id">;
 
 export function NewGameButton({
   sessionId,
   sessions,
   players,
+  games = [],
   nextGameNumber,
   redirectTo,
   variant = "grid",
@@ -19,6 +21,9 @@ export function NewGameButton({
   sessionId: string;
   sessions: SessionOption[];
   players: PlayerSessionWithPlayer[];
+  /** Every other game in this session — colors the player picker by who's
+   * free, queued, or currently playing. See GameFormFields. */
+  games?: GameForStatus[];
   nextGameNumber?: number;
   /** Where to land after saving — defaults to "/" (the dashboard). */
   redirectTo?: string;
@@ -58,6 +63,7 @@ export function NewGameButton({
           sessions={sessions}
           defaultSessionId={sessionId}
           players={players}
+          games={games}
           close={close}
           redirectTo={redirectTo}
         />

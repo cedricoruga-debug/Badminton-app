@@ -5,9 +5,10 @@ import { advanceGameStatus, deleteGame } from "@/app/actions";
 import { EditGameButton } from "@/app/components/EditGameButton";
 import { IconTrash } from "@/app/components/icons";
 import type { GameWithPlayers } from "@/lib/queries";
-import type { PlayerSessionWithPlayer } from "@/lib/types";
+import type { Game, PlayerSessionWithPlayer } from "@/lib/types";
 
 type SessionOption = { id: string; session_date: string };
+type GameForStatus = Pick<Game, "id" | "status" | "player1_id" | "player2_id" | "player3_id" | "player4_id">;
 
 const STATUS_STYLES: Record<string, string> = {
   Queued: "bg-brand-light text-brand",
@@ -19,10 +20,15 @@ export function GameRow({
   game,
   sessions,
   players,
+  games = [],
 }: {
   game: GameWithPlayers;
   sessions: SessionOption[];
   players: PlayerSessionWithPlayer[];
+  /** Every other game in this session — colors the edit popup's player
+   * picker by who's free, queued, or currently playing. See
+   * GameFormFields. */
+  games?: GameForStatus[];
 }) {
   const [isPending, startTransition] = useTransition();
   const [isDeleting, startDeleteTransition] = useTransition();
@@ -33,7 +39,7 @@ export function GameRow({
 
   return (
     <li className="border-b border-black/10 last:border-b-0">
-      <EditGameButton game={game} sessions={sessions} players={players}>
+      <EditGameButton game={game} sessions={sessions} players={players} games={games}>
         {(open) => (
           <div
             role="button"
