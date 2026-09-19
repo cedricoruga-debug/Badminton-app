@@ -11,6 +11,7 @@ import {
 } from "@/lib/queries";
 import { PlayerSessionRow } from "@/app/components/PlayerSessionRow";
 import { GameRow } from "@/app/components/GameRow";
+import { CourtBox } from "@/app/components/CourtBox";
 import { NewGameButton } from "@/app/components/NewGameButton";
 import { NewPlayerButton } from "@/app/components/NewPlayerButton";
 import { NewSessionButton } from "@/app/components/NewSessionButton";
@@ -36,6 +37,13 @@ export default async function Home() {
         getGames(session.id),
       ])
     : [[], [], 0, [], []];
+
+  // Ongoing games get drawn as courts up top (see CourtBox); games that
+  // haven't started yet stay in the plain list below. getQueuedGames
+  // already orders both by game_number, so that order carries over into
+  // each group.
+  const ongoingGames = queuedGames.filter((g) => g.status === "Ongoing");
+  const notStartedGames = queuedGames.filter((g) => g.status !== "Ongoing");
 
   // The 4 shortcut buttons — rendered twice below (once for the portrait
   // static top bar, once back in their original spot at the bottom of the
@@ -105,13 +113,24 @@ export default async function Home() {
          * narrower than the other two columns. */}
         <section className="flex min-h-0 min-w-0 flex-col rounded-xl bg-white p-4 shadow-sm landscape:order-2 landscape:h-full">
           <h3 className="mb-3 flex-none font-semibold">Games Queued</h3>
+
+          {ongoingGames.length > 0 && (
+            <div className="mb-3 grid flex-none grid-cols-4 gap-2">
+              {ongoingGames.map((g) => (
+                <CourtBox key={g.id} game={g} sessions={sessions} players={sessionPlayers} />
+              ))}
+            </div>
+          )}
+
           <ul className="max-h-96 overflow-x-hidden overflow-y-auto landscape:min-h-0 landscape:max-h-none landscape:flex-1">
             {!session ? (
               <li className="py-8 text-center text-sm text-black/50">No ongoing session yet.</li>
-            ) : queuedGames.length === 0 ? (
-              <li className="py-10 text-center text-sm text-black/40">No games queued right now.</li>
+            ) : notStartedGames.length === 0 ? (
+              <li className="py-10 text-center text-sm text-black/40">
+                {ongoingGames.length > 0 ? "No games queued — everyone's playing." : "No games queued right now."}
+              </li>
             ) : (
-              queuedGames.map((g) => (
+              notStartedGames.map((g) => (
                 <GameRow key={g.id} game={g} sessions={sessions} players={sessionPlayers} />
               ))
             )}
