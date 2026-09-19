@@ -57,6 +57,7 @@ export function Modal({
           onClick={() => setOpen(false)}
         >
           <div
+            data-modal-dialog
             className={`max-h-[85vh] w-full overflow-x-hidden overflow-y-auto rounded-lg bg-white shadow-xl ${
               size === "sm" ? "max-w-sm p-4" : "max-w-lg p-6"
             }`}

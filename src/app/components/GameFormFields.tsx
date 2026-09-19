@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { deleteGame } from "@/app/actions";
 import { PlayerHistoryPanel } from "@/app/components/PlayerHistoryPanel";
@@ -73,6 +73,28 @@ export function GameFormFields({
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [isDeleting, startDeleteTransition] = useTransition();
 
+  // Where to portal the history-panel row: right under the modal's own
+  // dialog box (not the bottom of the viewport), so it stays close instead
+  // of leaving a big gap on short forms. Tracks the dialog's live bottom
+  // edge (via the data-modal-dialog element Modal.tsx renders) so it stays
+  // put if the dialog resizes — e.g. the "Playing now" legend appearing.
+  const formRef = useRef<HTMLFormElement>(null);
+  const [panelTop, setPanelTop] = useState<number | null>(null);
+
+  useLayoutEffect(() => {
+    const dialog = formRef.current?.closest<HTMLElement>("[data-modal-dialog]");
+    if (!dialog) return;
+    const update = () => setPanelTop(dialog.getBoundingClientRect().bottom + 8);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(dialog);
+    window.addEventListener("resize", update);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", update);
+    };
+  }, []);
+
   // Who's already spoken for this session, excluding this very game (its
   // own roster shouldn't count as "already busy" — those players show as
   // selected/checked instead, via `selected`). Ongoing always wins over
@@ -116,7 +138,7 @@ export function GameFormFields({
 
   return (
     <>
-      <form action={action} className="space-y-6">
+      <form ref={formRef} action={action} className="space-y-6">
       {gameId && <input type="hidden" name="game_id" value={gameId} />}
       {redirectTo && <input type="hidden" name="redirect_to" value={redirectTo} />}
 
@@ -265,15 +287,20 @@ export function GameFormFields({
       </form>
 
       {/* One small floating card per currently-picked player, portaled to
-       * the very bottom of the page (below the modal, not inside it) so
-       * picking someone immediately shows "have they already played with X
-       * today" without an extra click or leaving the form. Laid out in a
-       * row (wrapping if it doesn't fit) rather than stacked, so a full
-       * 4-player pick stays a short strip under the modal instead of a tall
-       * column tall enough to cover it. */}
+       * the page body (below the modal, not inside it) so picking someone
+       * immediately shows "have they already played with X today" without
+       * an extra click or leaving the form. Laid out in a row (wrapping if
+       * it doesn't fit) rather than stacked, positioned just under the
+       * modal's own dialog box (see panelTop above) so it sits close to
+       * the form instead of pinned to the bottom of the screen. */}
       {selected.length > 0 &&
         createPortal(
-          <div className="pointer-events-none fixed inset-x-0 bottom-3 z-[60] flex flex-row flex-wrap items-start justify-center gap-2 px-4">
+          <div
+            className={`pointer-events-none fixed inset-x-0 z-[60] flex flex-row flex-wrap items-start justify-center gap-2 px-4 ${
+              panelTop === null ? "bottom-3" : ""
+            }`}
+            style={panelTop !== null ? { top: panelTop } : undefined}
+          >
             {selected.map((playerId) => {
               const ps = players.find((p) => p.player.id === playerId);
               if (!ps) return null;
