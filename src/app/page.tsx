@@ -16,7 +16,7 @@ import { NewGameButton } from "@/app/components/NewGameButton";
 import { NewPlayerButton } from "@/app/components/NewPlayerButton";
 import { NewSessionButton } from "@/app/components/NewSessionButton";
 import { SetupRequired } from "@/app/setup-required";
-import { IconPlus, IconTrophy, IconUserPlus } from "@/app/components/icons";
+import { IconPlus, IconRacket, IconTrophy, IconUserPlus, IconUsers } from "@/app/components/icons";
 
 export const dynamic = "force-dynamic";
 
@@ -68,7 +68,7 @@ export default async function Home() {
       <NewSessionButton />
 
       <Link href="/games" className="flex flex-col items-center gap-1">
-        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand text-white transition-transform hover:scale-105">
+        <span className="flex h-9 w-9 items-center justify-center rounded-full btn-brand text-white transition-transform hover:scale-105">
           <IconTrophy className="h-4 w-4" />
         </span>
         <span className="text-[10px] leading-tight text-black/60">Games</span>
@@ -84,7 +84,7 @@ export default async function Home() {
         />
       ) : (
         <div className="flex flex-col items-center gap-1 opacity-40">
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand text-white">
+          <span className="flex h-9 w-9 items-center justify-center rounded-full btn-brand text-white">
             <IconPlus className="h-5 w-5" />
           </span>
           <span className="text-[10px] leading-tight text-black/60">New Game</span>
@@ -95,7 +95,7 @@ export default async function Home() {
         <NewPlayerButton sessions={sessions} defaultSessionId={session.id} />
       ) : (
         <div className="flex flex-col items-center gap-1 opacity-40">
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand text-white">
+          <span className="flex h-9 w-9 items-center justify-center rounded-full btn-brand text-white">
             <IconUserPlus className="h-4 w-4" />
           </span>
           <span className="text-[10px] leading-tight text-black/60">New player</span>
@@ -112,7 +112,7 @@ export default async function Home() {
        * the buttons go back to their original spot at the bottom of the QR
        * panel below, so this bar is hidden there instead. */}
       <div className="sticky top-[60px] z-30 flex-none px-4 pt-4 landscape:hidden">
-        <div className="rounded-xl bg-white p-3 shadow-sm">
+        <div className="rounded-xl bg-white p-3 shadow-soft">
           <div className="grid grid-cols-2 gap-x-2 gap-y-3 text-center">{shortcutButtons}</div>
         </div>
       </div>
@@ -125,8 +125,11 @@ export default async function Home() {
          * (narrower) column — the original desktop arrangement. Players'
          * column is 0.5fr (was 1fr, then 0.75fr) so it renders noticeably
          * narrower than the other two columns. */}
-        <section className="flex min-h-0 min-w-0 flex-col rounded-xl bg-white p-4 shadow-sm landscape:order-2 landscape:h-full">
-          <h3 className="mb-3 flex-none font-semibold">Games Queued</h3>
+        <section className="flex min-h-0 min-w-0 flex-col rounded-xl bg-white p-4 shadow-soft landscape:order-2 landscape:h-full">
+          <h3 className="mb-3 flex flex-none items-center gap-1.5 font-semibold">
+            <IconRacket className="h-4 w-4 text-brand" />
+            Games Queued
+          </h3>
 
           {ongoingGames.length > 0 && (
             <div className="mb-3 grid flex-none grid-cols-4 gap-2">
@@ -164,8 +167,11 @@ export default async function Home() {
         </section>
 
         {/* Players — those registered for the latest session who haven't paid yet */}
-        <section className="flex min-h-0 min-w-0 flex-col rounded-xl bg-white p-4 shadow-sm landscape:order-1 landscape:h-full">
-          <h3 className="mb-3 flex-none font-semibold">Players</h3>
+        <section className="flex min-h-0 min-w-0 flex-col rounded-xl bg-white p-4 shadow-soft landscape:order-1 landscape:h-full">
+          <h3 className="mb-3 flex flex-none items-center gap-1.5 font-semibold">
+            <IconUsers className="h-4 w-4 text-brand" />
+            Players
+          </h3>
           <ul className="max-h-64 overflow-x-hidden overflow-y-auto landscape:min-h-0 landscape:max-h-none landscape:flex-1">
             {!session ? (
               <li className="py-8 text-center text-sm text-black/50">
@@ -181,7 +187,7 @@ export default async function Home() {
         </section>
 
         {/* Slim panel: payment QR + stats, at the bottom */}
-        <section className="min-w-0 overflow-x-hidden rounded-xl bg-white p-4 shadow-sm landscape:order-3 landscape:h-full landscape:overflow-y-auto">
+        <section className="min-w-0 overflow-x-hidden rounded-xl bg-white p-4 shadow-soft landscape:order-3 landscape:h-full landscape:overflow-y-auto">
           {settings?.payment_qr_url ? (
             <div className="flex flex-col items-center gap-2">
               {/* eslint-disable-next-line @next/next/no-img-element -- external, user-uploaded QR image of unknown origin */}

@@ -123,7 +123,7 @@ export function AppChrome({
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-50 flex items-center gap-3 bg-brand px-4 py-3 text-white">
+      <header className="sticky top-0 z-50 flex items-center gap-3 bg-gradient-to-r from-brand to-accent px-4 py-3 text-white shadow-[0_2px_14px_rgba(236,72,153,0.3)]">
         <span className="flex h-8 w-8 flex-none items-center justify-center overflow-hidden rounded-full bg-white/15">
           {settings?.app_icon_url ? (
             // eslint-disable-next-line @next/next/no-img-element -- user-uploaded image of unknown origin

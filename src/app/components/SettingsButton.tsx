@@ -69,7 +69,7 @@ function ChangePasswordSection() {
         type="button"
         disabled={loading || !newPassword || !confirmPassword}
         onClick={handleChangePassword}
-        className="rounded bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-dark disabled:opacity-50"
+        className="rounded btn-brand px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
       >
         {loading ? "Updating…" : "Update password"}
       </button>
@@ -158,7 +158,7 @@ export function SettingsButton({ settings }: { settings: AppSettings | null }) {
             </button>
             <button
               type="submit"
-              className="rounded bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark"
+              className="rounded btn-brand px-4 py-2 text-sm font-medium text-white"
             >
               Save
             </button>

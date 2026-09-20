@@ -54,7 +54,7 @@ export default async function SessionsPage(props: PageProps<"/sessions">) {
       ) : (
         <div className="flex flex-col gap-4 landscape:min-h-0 landscape:flex-1 landscape:flex-row landscape:items-stretch">
           {/* Dates panel — header fixed, only the date list scrolls */}
-          <section className="flex w-full flex-none flex-col overflow-hidden rounded-xl bg-white p-3 shadow-sm landscape:w-56">
+          <section className="flex w-full flex-none flex-col overflow-hidden rounded-xl bg-white p-3 shadow-soft landscape:w-56">
             <h3 className="mb-2 flex-none px-1 text-xs font-semibold uppercase tracking-wide text-black/40">
               Dates
             </h3>
@@ -81,7 +81,7 @@ export default async function SessionsPage(props: PageProps<"/sessions">) {
           </section>
 
           {/* Selected session's breakdown (fixed) with its players below (scrolls on its own) */}
-          <section className="flex min-w-0 flex-col overflow-hidden rounded-xl bg-white p-4 shadow-sm landscape:flex-1">
+          <section className="flex min-w-0 flex-col overflow-hidden rounded-xl bg-white p-4 shadow-soft landscape:flex-1">
             <div className="flex-none">
               <div className="mb-2 flex items-center justify-between px-1">
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-black/40">Details</h3>

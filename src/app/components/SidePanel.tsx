@@ -44,7 +44,7 @@ export function SidePanel({ settings, isAdmin }: { settings: AppSettings | null;
             title={label}
             aria-label={label}
             className={`flex h-10 w-10 items-center justify-center rounded-lg transition-colors ${
-              active ? "bg-brand text-white" : "text-black/50 hover:bg-brand-light hover:text-brand"
+              active ? "bg-gradient-to-br from-brand to-accent text-white shadow-sm shadow-brand/30" : "text-black/50 hover:bg-brand-light hover:text-brand"
             }`}
           >
             <Icon className="h-5 w-5" />
@@ -61,7 +61,7 @@ export function SidePanel({ settings, isAdmin }: { settings: AppSettings | null;
             title="Accounts"
             aria-label="Accounts"
             className={`flex h-10 w-10 items-center justify-center rounded-lg transition-colors ${
-              pathname === "/users" ? "bg-brand text-white" : "text-black/50 hover:bg-brand-light hover:text-brand"
+              pathname === "/users" ? "bg-gradient-to-br from-brand to-accent text-white shadow-sm shadow-brand/30" : "text-black/50 hover:bg-brand-light hover:text-brand"
             }`}
           >
             <IconKey className="h-5 w-5" />

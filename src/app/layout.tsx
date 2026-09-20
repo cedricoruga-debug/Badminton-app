@@ -1,4 +1,15 @@
 import type { Metadata } from "next";
+// Rounder and friendlier than the old plain Arial fallback — fits a casual
+// Saturday-badminton app better than a default system font. Self-hosted via
+// @fontsource (the font files ship in the npm package itself) rather than
+// next/font/google, which needs to reach fonts.googleapis.com at build
+// time — self-hosting also means production never depends on Google's CDN
+// being reachable. Wired to Tailwind's `font-sans` in globals.css, so every
+// existing `font-sans`/default-text element picks it up automatically.
+import "@fontsource/plus-jakarta-sans/400.css";
+import "@fontsource/plus-jakarta-sans/500.css";
+import "@fontsource/plus-jakarta-sans/600.css";
+import "@fontsource/plus-jakarta-sans/700.css";
 import "./globals.css";
 import { AppChrome } from "@/app/components/AppChrome";
 import { currentUserRole } from "@/lib/accounts";

@@ -52,7 +52,7 @@ export function CourtBox({
               open();
             }
           }}
-          className="flex cursor-pointer flex-col overflow-hidden rounded-xl shadow-sm ring-1 ring-black/10 transition-transform hover:-translate-y-0.5"
+          className="flex cursor-pointer flex-col overflow-hidden rounded-xl shadow-soft ring-1 ring-black/10 transition-transform hover:-translate-y-0.5"
         >
           <p className="flex-none truncate bg-black/80 px-1.5 py-1.5 text-center text-xs font-semibold text-white">
             Game {game.game_number}

@@ -11,10 +11,59 @@
   --color-brand: #ec4899;
   --color-brand-dark: #db2777;
   --color-brand-light: #fce7f3;
+
+  /* Secondary accent (indigo) — pairs with the pink brand color for a bit
+   * more depth wherever a single flat pink starts to feel monotonous (the
+   * header, active nav state, gradient buttons). Not used for status colors
+   * (those stay green/amber/red, set independently at each call site) so it
+   * never competes with "Done"/"Ongoing"/"delete" meanings. */
+  --color-accent: #6366f1;
+  --color-accent-dark: #4338ca;
+  --color-accent-light: #e0e7ff;
+
+  /* Self-hosted via @fontsource (imported in layout.tsx) — falls back to
+   * the system stack if it somehow fails to load. */
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
 }
 
 body {
-  background: var(--background);
+  /* A faint radial lift instead of a flat fill — subtle, not a visible
+   * "gradient", just keeps the page from reading as a single dead pink
+   * rectangle behind the cards. */
+  background: radial-gradient(circle at 50% 0%, #fef1f6 0%, var(--background) 60%);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+}
+
+/**
+ * Primary "brand" action button — every Save/Add/Create button in the app
+ * used a flat `bg-brand` fill with a `hover:bg-brand-dark` swap. This gives
+ * them a soft gradient, a brand-tinted glow, and a gentle hover brighten
+ * instead, without having to touch each button's padding/rounding/text
+ * classes. Usage: keep the existing layout classes, swap `bg-brand` for
+ * `btn-brand` and drop the `hover:bg-brand-dark` (this class replaces both).
+ */
+.btn-brand {
+  background-image: linear-gradient(135deg, var(--color-brand), var(--color-brand-dark));
+  color: #fff;
+  box-shadow: 0 3px 10px -2px rgba(219, 39, 119, 0.35);
+  transition: filter 150ms ease, box-shadow 150ms ease;
+}
+.btn-brand:hover:not(:disabled) {
+  filter: brightness(1.08);
+  box-shadow: 0 6px 16px -3px rgba(219, 39, 119, 0.45);
+}
+.btn-brand:disabled {
+  cursor: not-allowed;
+}
+
+/**
+ * A softer, brand-tinted replacement for the generic gray `shadow-sm` used
+ * on every card/panel — same subtlety, but with a faint pink cast instead
+ * of flat gray, so elevation feels tied to the app's palette rather than a
+ * default Tailwind shadow.
+ */
+.shadow-soft {
+  box-shadow:
+    0 1px 2px rgba(31, 21, 32, 0.04),
+    0 12px 28px -14px rgba(236, 72, 153, 0.35);
 }

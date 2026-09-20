@@ -277,7 +277,7 @@ export function GameFormFields({
             Cancel
           </button>
           <SubmitButton
-            className="rounded bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark"
+            className="rounded btn-brand px-4 py-2 text-sm font-medium text-white"
             pendingLabel="Saving…"
           >
             {submitLabel}

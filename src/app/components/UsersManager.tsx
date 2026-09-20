@@ -66,7 +66,7 @@ function AddAccountForm({ onDone }: { onDone: () => void }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3 rounded-xl bg-white p-4 shadow-sm">
+    <form onSubmit={handleSubmit} className="space-y-3 rounded-xl bg-white p-4 shadow-soft">
       <h3 className="text-xs font-semibold uppercase tracking-wide text-black/40">Add account</h3>
       <div className="flex flex-col gap-2 sm:flex-row">
         <input
@@ -101,7 +101,7 @@ function AddAccountForm({ onDone }: { onDone: () => void }) {
       <button
         type="submit"
         disabled={loading}
-        className="rounded bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-dark disabled:opacity-50"
+        className="rounded btn-brand px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
       >
         {loading ? "Adding…" : "Add account"}
       </button>
@@ -138,7 +138,7 @@ function AccountRow({
   }
 
   return (
-    <div className="rounded-xl bg-white p-4 shadow-sm">
+    <div className="rounded-xl bg-white p-4 shadow-soft">
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -279,7 +279,7 @@ function ResetPasswordForm({ userId, onDone }: { userId: string; onDone: () => v
         <button
           type="submit"
           disabled={loading}
-          className="flex-none rounded bg-brand px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-dark disabled:opacity-50"
+          className="flex-none rounded btn-brand px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
         >
           {loading ? "Saving…" : "Save"}
         </button>

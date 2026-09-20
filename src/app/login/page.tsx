@@ -51,9 +51,9 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-black/[0.02] p-4">
-      <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-sm">
+      <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-soft">
         <div className="mb-6 flex flex-col items-center gap-2">
-          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-brand text-white">
+          <span className="flex h-12 w-12 items-center justify-center rounded-full btn-brand text-white">
             <IconShuttle className="h-6 w-6" />
           </span>
           <h1 className="text-lg font-semibold">Queuing App by Ced</h1>
@@ -92,7 +92,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-dark disabled:opacity-50"
+            className="w-full rounded btn-brand px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
           >
             {loading ? "Signing in…" : "Sign in"}
           </button>

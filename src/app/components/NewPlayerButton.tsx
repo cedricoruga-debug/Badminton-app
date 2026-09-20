@@ -26,7 +26,7 @@ export function NewPlayerButton({
   if (!open) {
     return (
       <button type="button" onClick={() => setOpen(true)} className="flex flex-col items-center gap-1">
-        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand text-white transition-transform hover:scale-105">
+        <span className="flex h-9 w-9 items-center justify-center rounded-full btn-brand text-white transition-transform hover:scale-105">
           <IconUserPlus className="h-4 w-4" />
         </span>
         <span className="text-[10px] leading-tight text-black/60">New player</span>
@@ -78,7 +78,7 @@ export function NewPlayerButton({
 
         <div className="flex justify-end">
           <SubmitButton
-            className="rounded bg-brand px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-dark"
+            className="rounded btn-brand px-3 py-1.5 text-xs font-medium text-white"
             pendingLabel="Adding…"
           >
             Add player
