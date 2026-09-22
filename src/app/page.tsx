@@ -13,7 +13,7 @@ import {
 import { PlayerSessionRow } from "@/app/components/PlayerSessionRow";
 import { GameRow } from "@/app/components/GameRow";
 import { CourtBox } from "@/app/components/CourtBox";
-import { JoinCodeCard } from "@/app/components/JoinCodeCard";
+import { JoinQrSection } from "@/app/components/JoinQrSection";
 import { JoinRequestsPanel } from "@/app/components/JoinRequestsPanel";
 import { NewGameButton } from "@/app/components/NewGameButton";
 import { NewPlayerButton } from "@/app/components/NewPlayerButton";
@@ -240,14 +240,6 @@ export default async function Home() {
                 {session ? new Date(session.session_date).toLocaleDateString("en-US") : "—"}
               </dd>
             </div>
-            {session && (
-              <div className="flex items-center justify-between">
-                <dt className="text-black/50">Join code</dt>
-                <dd>
-                  <JoinCodeCard sessionId={session.id} joinCode={session.join_code} />
-                </dd>
-              </div>
-            )}
             <div className="flex justify-between">
               <dt className="text-black/50">Total games</dt>
               <dd className="font-medium">{totalGameCount}</dd>
@@ -280,6 +272,19 @@ export default async function Home() {
               </dd>
             </div>
           </dl>
+
+          {/* Join QR — pinned to the very bottom of the panel (so, in
+           * portrait, the very bottom of the whole page), styled to match
+           * the payment QR up top: same centered/rounded treatment, same
+           * dashed empty-state box when there's nothing to show yet.
+           * Collapsed behind a toggle by default rather than always-on
+           * like the payment QR — unlike that one, this QR is something
+           * you'd only pull up in the moment a new player's arriving. */}
+          {session && (
+            <div className="mt-5 border-t border-black/10 pt-4">
+              <JoinQrSection sessionId={session.id} joinCode={session.join_code} />
+            </div>
+          )}
         </section>
       </main>
     </div>
