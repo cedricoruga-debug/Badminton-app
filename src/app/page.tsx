@@ -4,7 +4,6 @@ import {
   getAppSettings,
   getGames,
   getLatestSession,
-  getPendingJoinRequests,
   getPlayerSessions,
   getQueuedGames,
   getSessionGameCount,
@@ -14,7 +13,7 @@ import { PlayerSessionRow } from "@/app/components/PlayerSessionRow";
 import { GameRow } from "@/app/components/GameRow";
 import { CourtBox } from "@/app/components/CourtBox";
 import { JoinQrSection } from "@/app/components/JoinQrSection";
-import { JoinRequestsPanel } from "@/app/components/JoinRequestsPanel";
+import { PaymentQrSection } from "@/app/components/PaymentQrSection";
 import { NewGameButton } from "@/app/components/NewGameButton";
 import { NewPlayerButton } from "@/app/components/NewPlayerButton";
 import { NewSessionButton } from "@/app/components/NewSessionButton";
@@ -31,16 +30,15 @@ export default async function Home() {
   const settings = await getAppSettings();
   const session = await getLatestSession();
   const sessions = await getAllSessions();
-  const [unpaid, queuedGames, totalGameCount, sessionPlayers, allSessionGames, pendingJoinRequests] = session
+  const [unpaid, queuedGames, totalGameCount, sessionPlayers, allSessionGames] = session
     ? await Promise.all([
         getUnpaidPlayerSessions(session.id),
         getQueuedGames(session.id),
         getSessionGameCount(session.id),
         getPlayerSessions(session.id),
         getGames(session.id),
-        getPendingJoinRequests(session.id),
       ])
-    : [[], [], 0, [], [], []];
+    : [[], [], 0, [], []];
 
   // Ongoing games get drawn as courts up top (see CourtBox); games that
   // haven't started yet stay in the plain list below. getQueuedGames
@@ -134,12 +132,6 @@ export default async function Home() {
         </div>
       </div>
 
-      {session && pendingJoinRequests.length > 0 && (
-        <div className="px-4 pt-4 landscape:pt-4">
-          <JoinRequestsPanel sessionId={session.id} requests={pendingJoinRequests} />
-        </div>
-      )}
-
       <main className="flex flex-1 flex-col gap-4 px-4 pb-4 pt-4 landscape:grid landscape:min-h-0 landscape:grid-cols-[0.5fr_1.8fr_0.8fr]">
         {/* Games Queued — what's left to play this session. Stays first in
          * the markup (so portrait/mobile shows it on top, per an earlier
@@ -211,23 +203,7 @@ export default async function Home() {
 
         {/* Slim panel: payment QR + stats, at the bottom */}
         <section className="min-w-0 overflow-x-hidden rounded-xl bg-white p-4 shadow-soft landscape:order-3 landscape:h-full landscape:overflow-y-auto">
-          {settings?.payment_qr_url ? (
-            <div className="flex flex-col items-center gap-2">
-              {/* eslint-disable-next-line @next/next/no-img-element -- external, user-uploaded QR image of unknown origin */}
-              <img
-                src={settings.payment_qr_url}
-                alt="Payment QR code"
-                width={400}
-                height={400}
-                className="h-auto w-full max-w-[360px] rounded"
-              />
-            </div>
-          ) : (
-            <div className="flex h-[140px] flex-col items-center justify-center gap-1 rounded border border-dashed border-black/15 px-3 text-center text-[11px] text-black/40">
-              <p>No payment QR yet.</p>
-              <p>Upload one from the Settings icon on the right.</p>
-            </div>
-          )}
+          <PaymentQrSection qrUrl={settings?.payment_qr_url ?? null} />
 
           <div className="mt-5 hidden grid-cols-2 gap-x-2 gap-y-3 text-center landscape:grid">
             {shortcutButtons}

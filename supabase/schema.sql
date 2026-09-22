@@ -179,29 +179,28 @@ insert into app_settings (id) values (1)
   on conflict (id) do nothing;
 
 -- ---------------------------------------------------------------------------
--- join_requests
--- Self-service "join by code" (ShuttleFlow-inspired): a player who isn't
--- logged in visits the public /join page, enters the session's 6-digit
--- join_code and their name, and lands here as a pending request. The queue
--- master (already logged in) approves or declines from the dashboard —
--- approving is what actually registers them via registerPlayerForSession,
--- same as any other player add. This table is the ONLY thing an anonymous
--- visitor can touch; everything else still requires login (see RLS below).
+-- Public queue viewing
+-- The public /join page lets anyone with a session's 6-digit join_code see
+-- a live, read-only view of who's playing now and who's up next — no login,
+-- no registration, nothing for the queue master to approve. (An earlier
+-- version had visitors submit a "join request" into a join_requests table
+-- for the queue master to approve — dropped below. A viewer here isn't
+-- asking to be added to the roster, so there was never anything to
+-- approve; players are still added by the queue master via the New Player
+-- button, same as always.) These two functions are the ONLY read access an
+-- anonymous visitor has — security definer runs them with the function
+-- owner's privileges, bypassing RLS *only* for the exact columns selected,
+-- never the full sessions/games tables (which also hold cost/fee data and
+-- far more than a viewer needs).
 -- ---------------------------------------------------------------------------
-create table if not exists join_requests (
-  id uuid primary key default gen_random_uuid(),
-  session_id uuid not null references sessions(id) on delete cascade,
-  player_name text not null,
-  status text not null default 'pending' check (status in ('pending', 'approved', 'declined')),
-  created_at timestamptz not null default now()
-);
 
--- Lets the public /join page turn a join_code into a session_id (plus just
--- enough to show "you're joining Sat, Oct 4" for confirmation) without
--- granting anon any read access to the sessions table itself — `sessions`
--- also holds cost/fee figures that aren't anyone's business but the queue
--- master's. security definer runs this with the function owner's
--- privileges, bypassing RLS *only* for the exact columns selected here.
+-- join_requests' whole job (approve/decline) doesn't exist anymore now that
+-- /join is view-only — safe to re-run, a no-op once it's already dropped.
+drop table if exists join_requests;
+
+-- Turns a join_code into a session_id (plus just enough to show "Queue for
+-- Sat, Oct 4") without granting anon any read access to the sessions table
+-- itself.
 create or replace function find_session_by_join_code(code text)
 returns table (id uuid, session_date date, title text)
 language sql
@@ -212,6 +211,37 @@ as $$
 $$;
 
 grant execute on function find_session_by_join_code(text) to anon, authenticated;
+
+-- The queue itself: every not-yet-finished game (Queued or Ongoing) for the
+-- session matching that code, with player *names* only — no ids, no costs,
+-- nothing about players who aren't in one of those games.
+create or replace function get_queue_by_code(code text)
+returns table (
+  game_number integer,
+  status text,
+  player1_name text,
+  player2_name text,
+  player3_name text,
+  player4_name text
+)
+language sql
+security definer
+set search_path = public
+as $$
+  select g.game_number, g.status, p1.name, p2.name, p3.name, p4.name
+  from games g
+  join sessions s on s.id = g.session_id
+  left join players p1 on p1.id = g.player1_id
+  left join players p2 on p2.id = g.player2_id
+  left join players p3 on p3.id = g.player3_id
+  left join players p4 on p4.id = g.player4_id
+  where s.join_code = code
+    and s.status = 'Open'
+    and g.status in ('Queued', 'Ongoing')
+  order by g.game_number;
+$$;
+
+grant execute on function get_queue_by_code(text) to anon, authenticated;
 
 -- ---------------------------------------------------------------------------
 -- Row Level Security
@@ -227,7 +257,6 @@ alter table sessions enable row level security;
 alter table games enable row level security;
 alter table player_sessions enable row level security;
 alter table app_settings enable row level security;
-alter table join_requests enable row level security;
 
 drop policy if exists "Allow all (temporary, no auth yet)" on players;
 drop policy if exists "Allow all (temporary, no auth yet)" on sessions;
@@ -245,22 +274,6 @@ create policy "Require login" on sessions for all using (auth.uid() is not null)
 create policy "Require login" on games for all using (auth.uid() is not null) with check (auth.uid() is not null);
 create policy "Require login" on player_sessions for all using (auth.uid() is not null) with check (auth.uid() is not null);
 create policy "Require login" on app_settings for all using (auth.uid() is not null) with check (auth.uid() is not null);
-
--- join_requests is the one table anon can write to (insert only, from the
--- public /join page) — everything else about it (viewing the list,
--- approving, declining) still requires login, same as every other table.
-drop policy if exists "Anyone can submit a join request" on join_requests;
-drop policy if exists "Require login to view join requests" on join_requests;
-drop policy if exists "Require login to manage join requests" on join_requests;
-
-create policy "Anyone can submit a join request" on join_requests
-  for insert with check (status = 'pending');
-create policy "Require login to view join requests" on join_requests
-  for select using (auth.uid() is not null);
-create policy "Require login to manage join requests" on join_requests
-  for update using (auth.uid() is not null) with check (auth.uid() is not null);
-create policy "Require login to delete join requests" on join_requests
-  for delete using (auth.uid() is not null);
 
 -- ---------------------------------------------------------------------------
 -- Realtime
@@ -296,12 +309,6 @@ end $$;
 do $$
 begin
   alter publication supabase_realtime add table app_settings;
-exception when duplicate_object then null;
-end $$;
-
-do $$
-begin
-  alter publication supabase_realtime add table join_requests;
 exception when duplicate_object then null;
 end $$;
 

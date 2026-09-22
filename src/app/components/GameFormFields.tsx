@@ -28,24 +28,48 @@ const PICKER_STATUS_STYLES = {
 
 
 /**
- * "Magic Queue"-style auto-suggest: picks up to 4 free players for the next
- * match instead of the queue master choosing every one by hand. Weighted
- * by, in priority order: hasn't played yet / waited longest since their
- * last game, then fewest games played overall as a tiebreak, while
- * preferring not to just replay the exact same 4 who were in the last
- * completed/ongoing game (falls back to including them anyway if there
- * aren't 4 free alternatives). Pure function so it's easy to reason about
- * independent of the component's render.
+ * "Magic Queue"-style auto-suggest: picks up to 4 players for this game
+ * instead of the queue master choosing every one by hand. Considers the
+ * *whole* roster, not just players with nothing else queued right now —
+ * games often get queued several deep in advance ("New Game #4" while
+ * #1-3 are still queued/ongoing), and by the time a later game's turn
+ * comes around, players from those earlier games have already finished.
+ * An earlier version only ever suggested from players with zero games
+ * queued/ongoing anywhere, so once most of the roster had *something*
+ * upcoming, Suggest would quietly run out of candidates and suggest
+ * nothing.
+ *
+ * Weighted by, in priority order: fewest games already queued/ongoing
+ * elsewhere (spreads the *upcoming* queue fairly instead of only caring
+ * who's free this exact instant), then hasn't played yet / waited longest
+ * since their last game, then fewest games played overall as a final
+ * tiebreak — while preferring not to just replay the exact same 4 who were
+ * in the last completed/ongoing game (falls back to including them anyway
+ * if there aren't 4 alternatives). Pure function so it's easy to reason
+ * about independent of the component's render.
  */
 function suggestNextMatch(
   players: PlayerSessionWithPlayer[],
   games: GameForStatus[],
-  playerStatus: Map<string, "queued" | "ongoing">
+  gameId: string | undefined
 ): string[] {
-  const free = players.filter((ps) => !playerStatus.has(ps.player.id));
-  if (free.length === 0) return [];
+  if (players.length === 0) return [];
 
   const maxGameNumber = games.reduce((max, g) => Math.max(max, g.game_number), 0);
+
+  // How many OTHER games (Queued or Ongoing, excluding this one) a player
+  // is already lined up for. 0 means genuinely free right now, but 1 or 2
+  // just means "already has something coming up" — not "unavailable" —
+  // which is what lets Suggest keep working once most of the roster
+  // already has a game queued.
+  function upcomingCount(ps: PlayerSessionWithPlayer): number {
+    let count = 0;
+    for (const g of games) {
+      if (g.id === gameId || g.status === "Done") continue;
+      if ([g.player1_id, g.player2_id, g.player3_id, g.player4_id].includes(ps.player.id)) count++;
+    }
+    return count;
+  }
 
   function waitScore(ps: PlayerSessionWithPlayer): number {
     const played = games.filter(
@@ -60,9 +84,10 @@ function suggestNextMatch(
     return maxGameNumber - lastPlayed;
   }
 
-  const ranked = free
-    .map((ps) => ({ ps, wait: waitScore(ps) }))
+  const ranked = players
+    .map((ps) => ({ ps, upcoming: upcomingCount(ps), wait: waitScore(ps) }))
     .sort((a, b) => {
+      if (a.upcoming !== b.upcoming) return a.upcoming - b.upcoming;
       if (a.wait !== b.wait) return b.wait - a.wait;
       return a.ps.total_games - b.ps.total_games;
     });
@@ -160,13 +185,23 @@ export function GameFormFields({
   // of leaving a big gap on short forms. Tracks the dialog's live bottom
   // edge (via the data-modal-dialog element Modal.tsx renders) so it stays
   // put if the dialog resizes — e.g. the "Playing now" legend appearing.
+  // Also tracks how much viewport is actually left below that point — on a
+  // tall dialog (many fields, or a player deep into a session's games)
+  // there isn't much room, and without a cap the cards just ran off the
+  // bottom of the screen; panelMaxHeight lets each PlayerHistoryPanel cap
+  // itself and scroll internally instead.
   const formRef = useRef<HTMLFormElement>(null);
   const [panelTop, setPanelTop] = useState<number | null>(null);
+  const [panelMaxHeight, setPanelMaxHeight] = useState<number | null>(null);
 
   useLayoutEffect(() => {
     const dialog = formRef.current?.closest<HTMLElement>("[data-modal-dialog]");
     if (!dialog) return;
-    const update = () => setPanelTop(dialog.getBoundingClientRect().bottom + 8);
+    const update = () => {
+      const top = dialog.getBoundingClientRect().bottom + 8;
+      setPanelTop(top);
+      setPanelMaxHeight(Math.max(120, window.innerHeight - top - 12));
+    };
     update();
     const ro = new ResizeObserver(update);
     ro.observe(dialog);
@@ -319,8 +354,8 @@ export function GameFormFields({
           <span className="flex items-center gap-2">
             <button
               type="button"
-              title="Auto-pick 4 players — weighted by who's waited longest and hasn't just played together"
-              onClick={() => setSelected(suggestNextMatch(players, games, playerStatus))}
+              title="Auto-pick 4 players — weighted by fewest games already queued, then who's waited longest"
+              onClick={() => setSelected(suggestNextMatch(players, games, gameId))}
               className="rounded-full border border-brand/30 px-2 py-0.5 text-[11px] font-medium text-brand transition-colors hover:bg-brand-light"
             >
               ✨ Suggest
@@ -456,6 +491,7 @@ export function GameFormFields({
                     playerName={ps.player.name}
                     games={games}
                     nameById={nameById}
+                    maxHeight={panelMaxHeight ?? undefined}
                   />
                 </div>
               );

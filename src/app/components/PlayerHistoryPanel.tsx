@@ -19,12 +19,19 @@ export function PlayerHistoryPanel({
   playerName,
   games,
   nameById,
+  maxHeight,
 }: {
   playerId: string;
   playerName: string;
   games: GameForHistory[];
   /** player_id -> display name, for the other names in each listed game. */
   nameById: Map<string, string>;
+  /** Caps the card to however much room is actually left below the modal
+   * (GameFormFields measures it live) and makes the game list itself
+   * scroll internally once it would otherwise run past that — a player
+   * deep into a session's games no longer gets a card that quietly runs
+   * off the bottom of the screen with nothing to scroll it into view. */
+  maxHeight?: number;
 }) {
   const playedGames = games
     .filter(
@@ -35,15 +42,19 @@ export function PlayerHistoryPanel({
     .sort((a, b) => a.game_number - b.game_number);
 
   return (
-    <div className="w-64 flex-none rounded-lg border border-black/10 bg-white p-2.5 shadow-lg">
-      <p className="mb-1.5 truncate text-xs font-semibold text-brand">{playerName}&apos;s games</p>
+    <div
+      className="flex w-64 flex-none flex-col rounded-lg border border-black/10 bg-white p-2.5 shadow-lg"
+      style={maxHeight ? { maxHeight } : undefined}
+    >
+      <p className="mb-1.5 flex-none truncate text-xs font-semibold text-brand">{playerName}&apos;s games</p>
       {playedGames.length === 0 ? (
         <p className="text-xs text-black/40">Hasn&apos;t played yet today.</p>
       ) : (
         // Every game as one compact row (game #, "A / B / C / D" roster, a
-        // status dot) rather than a two-line card per game, so the whole
-        // session's history fits at a glance with no cap and no scrolling.
-        <ul className="space-y-0.5">
+        // status dot) rather than a two-line card per game. Scrolls within
+        // its own space (min-h-0 + flex-1 + overflow-y-auto) once capped by
+        // maxHeight above, instead of growing past the viewport.
+        <ul className="min-h-0 flex-1 space-y-0.5 overflow-y-auto pr-0.5">
           {playedGames.map((g) => {
             // Same "A / B / C / D" format as the Games played list in a
             // player's own popup on the Players grid — all 4 slots, this

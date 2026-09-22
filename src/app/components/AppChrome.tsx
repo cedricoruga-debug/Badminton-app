@@ -12,14 +12,7 @@ const APP_TITLE = "Queuing App by Ced";
 
 /** Every table a page on this site reads from — a change to any of them
  * could be showing on someone else's screen right now. */
-const WATCHED_TABLES = [
-  "players",
-  "sessions",
-  "games",
-  "player_sessions",
-  "app_settings",
-  "join_requests",
-] as const;
+const WATCHED_TABLES = ["players", "sessions", "games", "player_sessions", "app_settings"] as const;
 
 /** If several rows change at once (e.g. saving a game touches both `games`
  * and `player_sessions`), coalesce them into one refresh instead of one per
@@ -111,7 +104,7 @@ function useLiveRefresh(enabled: boolean) {
 
 /** Pages that render full-screen with none of the usual chrome — each has
  * its own centered card layout, and a visitor there either isn't signed in
- * yet (`/login`) or never will be (`/join`, the public self-service page),
+ * yet (`/login`) or never will be (`/join`, the public queue-viewing page),
  * so the nav links to pages they can't use would just be confusing. */
 const CHROMELESS_PATHS = ["/login", "/join"];
 

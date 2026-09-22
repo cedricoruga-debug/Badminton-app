@@ -8,12 +8,12 @@ import { createServerClient } from "@supabase/ssr";
  * `/login` and `/join` requires a signed-in Supabase user; unauthenticated
  * visitors are bounced to `/login`, and a signed-in user hitting `/login`
  * (or `/join` — an admin has no reason to be there) is bounced to `/`.
- * `/join` is the one deliberately public page: the self-service page a
- * player without an account uses to request a spot in a session by code
- * (see submitJoinRequest in actions.ts) — RLS on join_requests is what
- * actually limits what an anonymous visitor there can do, not this check.
- * This proxy is what makes every other page private instead of open to
- * anyone who finds the URL.
+ * `/join` is the one deliberately public page: a player without an account
+ * uses it to view a session's live queue by code (see JoinForm.tsx) — two
+ * security-definer functions (find_session_by_join_code, get_queue_by_code
+ * in schema.sql) are what actually limit what an anonymous visitor there
+ * can read, not this check. This proxy is what makes every other page
+ * private instead of open to anyone who finds the URL.
  *
  * Uses `getSession()` (reads the session straight out of the request
  * cookie, no network call) rather than `getUser()` (asks Supabase's Auth

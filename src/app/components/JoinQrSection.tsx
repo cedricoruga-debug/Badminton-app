@@ -5,18 +5,18 @@ import { QRCodeSVG } from "qrcode.react";
 import { backfillSessionJoinCode } from "@/app/actions";
 
 /**
- * The "join by QR" block at the very bottom of the dashboard's QR/Details
- * panel — deliberately styled to echo the payment QR at the top of that
- * same panel (centered, rounded, the same dashed empty-state box for "not
- * set up yet") so the two read as a matching pair, not two unrelated
- * features bolted together.
+ * The "view queue by QR" block at the very bottom of the dashboard's
+ * QR/Details panel — deliberately styled to echo the payment QR at the top
+ * of that same panel (centered, rounded, the same dashed empty-state box
+ * for "not set up yet") so the two read as a matching pair, not two
+ * unrelated features bolted together.
  *
- * Unlike the payment QR, this one is hidden behind a "Show QR" toggle
- * rather than always visible: the payment QR is something every player
- * glances at all session, but the join QR only matters in the moment a new
- * player is standing there wanting to scan it — no reason to have it
- * on-screen (and scannable by anyone glancing at the tablet) the rest of
- * the time.
+ * Scanning it (or visiting /join with the code typed in) takes a player
+ * straight to a live, read-only view of who's playing now and who's up
+ * next — no sign-up, nothing for the queue master to approve. Hidden behind
+ * a "Show QR" toggle rather than always visible, same reasoning as the
+ * payment QR's own toggle: it only matters in the moment someone wants to
+ * check the queue, no reason for it to sit on-screen the rest of the time.
  */
 export function JoinQrSection({ sessionId, joinCode }: { sessionId: string; joinCode: string | null }) {
   const [isPending, startTransition] = useTransition();
@@ -24,7 +24,7 @@ export function JoinQrSection({ sessionId, joinCode }: { sessionId: string; join
   if (!joinCode) {
     return (
       <div className="flex flex-col items-center gap-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-black/40">Join by QR</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-black/40">View queue by QR</p>
         <div className="flex h-[100px] w-full flex-col items-center justify-center gap-1 rounded border border-dashed border-black/15 px-3 text-center text-[11px] text-black/40">
           <p>No join code yet.</p>
           <button
@@ -42,7 +42,7 @@ export function JoinQrSection({ sessionId, joinCode }: { sessionId: string; join
 
   return (
     <div className="flex flex-col items-center gap-2">
-      <p className="text-xs font-semibold uppercase tracking-wide text-black/40">Join by QR</p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-black/40">View queue by QR</p>
       <JoinQrToggle joinCode={joinCode} />
     </div>
   );
@@ -87,7 +87,7 @@ function JoinQrToggle({ joinCode }: { joinCode: string }) {
             <QRCodeSVG value={`${window.location.origin}/join?code=${joinCode}`} size={200} className="h-auto w-full" />
           </div>
           <p className="text-center text-[11px] text-black/40">
-            Scans straight to the join page with this code filled in.
+            Scans straight to the live queue with this code filled in.
           </p>
           <button type="button" onClick={copyLink} className="text-[11px] font-medium text-brand hover:underline">
             {copied ? "Link copied ✓" : "Copy link instead"}

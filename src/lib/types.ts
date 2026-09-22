@@ -10,7 +10,7 @@ export type Session = {
   session_date: string;
   title: string | null;
   status: "Open" | "Closed";
-  /** 6-digit code players enter on /join to request a spot in this session. */
+  /** 6-digit code players enter on /join to view this session's live queue. */
   join_code: string | null;
   hours: number;
   fee_per_hour: number;
@@ -60,14 +60,6 @@ export type PlayerSession = {
 
 export type PlayerSessionWithPlayer = PlayerSession & {
   player: Player;
-};
-
-export type JoinRequest = {
-  id: string;
-  session_id: string;
-  player_name: string;
-  status: "pending" | "approved" | "declined";
-  created_at: string;
 };
 
 export type AppSettings = {
