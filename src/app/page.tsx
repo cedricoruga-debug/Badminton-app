@@ -52,12 +52,14 @@ export default async function Home() {
   // How many courts fit in one row before the strip below starts scrolling
   // sideways instead of shrinking further or wrapping to a second row. 1-2
   // courts keep the same size they'd have side by side (no visible change);
-  // 3 or 4 shrink together so all of them still fit in one row; 5+ hold that
-  // same "4 courts wide" size and just scroll — never smaller, never a
-  // second row eating vertical space. Computed here (not in CSS) because
-  // it depends on how many courts there actually are, which only this
-  // server component knows before the browser does.
-  const courtColumns = Math.min(4, Math.max(2, ongoingGames.length));
+  // 3 shrink together so all three still fit in one row; 4+ hold that same
+  // "3 courts wide" size and just scroll — never smaller, never a second
+  // row eating vertical space. Capped at 3 rather than 4 so each court
+  // stays a comfortably large tap target on a phone — 4-across made the
+  // winner-shortcut halves too cramped to reliably tap. Computed here (not
+  // in CSS) because it depends on how many courts there actually are,
+  // which only this server component knows before the browser does.
+  const courtColumns = Math.min(3, Math.max(2, ongoingGames.length));
   const courtWidth = `calc((100% - ${(courtColumns - 1) * 0.75}rem) / ${courtColumns})`;
 
   // A few extra numbers for the Details panel below the QR code — all
@@ -148,13 +150,14 @@ export default async function Home() {
       {/* On court — every Ongoing game, drawn as a court card, in its own
        * full-width band above the three-column layout rather than eating
        * space inside "Games Queued" below. Always a single row: 1-2 courts
-       * just sit at their natural size, 3-4 shrink together to still fit
-       * that one row, and a 5th+ court doesn't shrink the rest any further
-       * or wrap to a second row — the strip scrolls sideways instead, so
-       * this band's height never grows with how many courts are live. Below
-       * 420px it falls back to stacking full-width (one court per line) —
-       * shrinking 2-4 across on a narrow phone would leave them too
-       * cramped to read. */}
+       * just sit at their natural size, 3 shrink together to still fit that
+       * one row, and a 4th+ court doesn't shrink the rest any further or
+       * wrap to a second row — the strip scrolls sideways instead, so this
+       * band's height never grows with how many courts are live, and each
+       * court stays big enough to tap accurately (see courtColumns above).
+       * Below 420px it falls back to stacking full-width (one court per
+       * line) — shrinking 2-3 across on a narrow phone would leave them too
+       * cramped to read or tap. */}
       {ongoingGames.length > 0 && (
         <div className="flex-none px-4 pt-4">
           <section className="rounded-xl bg-white p-4 shadow-soft">
