@@ -3,6 +3,7 @@
 import { useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { deleteGame } from "@/app/actions";
+import { Matchup } from "@/app/components/Matchup";
 import { PlayerHistoryPanel } from "@/app/components/PlayerHistoryPanel";
 import { SubmitButton } from "@/app/components/SubmitButton";
 import type { Game, PlayerSessionWithPlayer } from "@/lib/types";
@@ -363,6 +364,9 @@ export function GameFormFields({
             <span className="font-normal text-black/40">{selected.length}/4</span>
           </span>
         </legend>
+        <p className="mb-2 text-xs text-black/40">
+          Tap order sets the teams — your 1st &amp; 2nd picks play together, then your 3rd &amp; 4th.
+        </p>
         {players.length === 0 ? (
           <p className="text-sm text-black/40">No players registered for this session yet.</p>
         ) : (
@@ -377,19 +381,27 @@ export function GameFormFields({
                   : status === "queued"
                     ? PICKER_STATUS_STYLES.queued
                     : PICKER_STATUS_STYLES.free;
+              // Which pick number this player is, if selected (1-4) — shown
+              // as a small badge so it's obvious at a glance which team a
+              // tap just landed someone on, not just that they're picked.
+              const pickNumber = selected.indexOf(ps.player.id) + 1;
               return (
                 <label key={ps.player.id}>
+                  {/* No `name` here on purpose — this checkbox only drives
+                   * the visual toggle. The actual player_id values that get
+                   * submitted come from the hidden inputs below, in
+                   * `selected`'s (i.e. tap) order — a native multi-checkbox
+                   * submits in DOM/roster order instead, which would silently
+                   * scramble who's paired with whom. */}
                   <input
                     type="checkbox"
-                    name="player_id"
-                    value={ps.player.id}
                     checked={checked}
                     disabled={disabled}
                     onChange={() => toggle(ps.player.id)}
                     className="peer sr-only"
                   />
                   <span
-                    className={`block rounded border px-3 py-1.5 text-sm transition-colors ${
+                    className={`flex items-center gap-1 rounded border px-3 py-1.5 text-sm transition-colors ${
                       checked
                         ? "cursor-pointer border-brand bg-brand text-white"
                         : disabled
@@ -397,19 +409,36 @@ export function GameFormFields({
                           : `cursor-pointer ${statusClasses}`
                     }`}
                   >
+                    {checked && (
+                      <span className="flex h-4 w-4 flex-none items-center justify-center rounded-full bg-white/25 text-[10px] font-bold">
+                        {pickNumber}
+                      </span>
+                    )}
                     {ps.player.name}
-                    <span className="ml-1 text-[10px] opacity-70">({ps.total_games})</span>
+                    <span className="text-[10px] opacity-70">({ps.total_games})</span>
                   </span>
                 </label>
               );
             })}
           </div>
         )}
+        {selected.map((id) => (
+          <input key={id} type="hidden" name="player_id" value={id} />
+        ))}
         {games.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-black/40">
             <Legend swatch="bg-emerald-100 border-emerald-300" label="Not queued" />
             <Legend swatch="bg-amber-100 border-amber-300" label="Queued" />
             <Legend swatch="bg-red-100 border-red-300" label="Playing now" />
+          </div>
+        )}
+        {selected.length > 0 && (
+          <div className="mt-3 rounded-lg bg-black/[0.03] px-3 py-2.5">
+            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-black/40">Matchup</p>
+            <Matchup
+              team1={[nameById.get(selected[0]), nameById.get(selected[1])]}
+              team2={[nameById.get(selected[2]), nameById.get(selected[3])]}
+            />
           </div>
         )}
       </fieldset>

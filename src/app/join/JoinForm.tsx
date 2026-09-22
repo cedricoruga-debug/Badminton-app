@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { IconShuttle } from "@/app/components/icons";
+import { Matchup } from "@/app/components/Matchup";
 
 type QueueGame = {
   gameNumber: number;
@@ -257,7 +258,7 @@ function QueueView({
                       On court
                     </span>
                   </div>
-                  <Matchup players={g.players} />
+                  <Matchup team1={g.players.slice(0, 2)} team2={g.players.slice(2, 4)} />
                 </li>
               ))}
             </ul>
@@ -279,7 +280,7 @@ function QueueView({
                     <p className="mb-0.5 text-[10px] font-medium uppercase tracking-wide text-black/30">
                       Game {g.gameNumber}
                     </p>
-                    <Matchup players={g.players} />
+                    <Matchup team1={g.players.slice(0, 2)} team2={g.players.slice(2, 4)} />
                   </div>
                 </li>
               ))}
@@ -300,24 +301,6 @@ function EmptyRow({ text }: { text: string }) {
   return (
     <div className="flex h-16 items-center justify-center rounded-xl border border-dashed border-black/10 text-center text-sm text-black/40">
       {text}
-    </div>
-  );
-}
-
-/** "Ced & Weng  vs  Tey & Ron" — a blank slot (game logged with fewer than
- * 4 players) just drops out of its side rather than showing a placeholder.
- * Both sides get equal room and truncate independently so one long name
- * doesn't push the "vs" badge off a narrow phone screen. */
-function Matchup({ players }: { players: [string | null, string | null, string | null, string | null] }) {
-  const team1 = players.slice(0, 2).filter(Boolean).join(" & ") || "—";
-  const team2 = players.slice(2, 4).filter(Boolean).join(" & ") || "—";
-  return (
-    <div className="flex items-center gap-2">
-      <span className="min-w-0 flex-1 truncate text-sm font-semibold text-black/80">{team1}</span>
-      <span className="flex-none rounded-full bg-black/5 px-1.5 py-0.5 text-[9px] font-bold uppercase text-black/40">
-        vs
-      </span>
-      <span className="min-w-0 flex-1 truncate text-right text-sm font-semibold text-black/80">{team2}</span>
     </div>
   );
 }

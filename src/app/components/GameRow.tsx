@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { deleteGame } from "@/app/actions";
 import { EditGameButton } from "@/app/components/EditGameButton";
 import { IconTrash } from "@/app/components/icons";
+import { Matchup } from "@/app/components/Matchup";
 import { queueableAdvanceGameStatus, useIsOnline } from "@/lib/offlineQueue";
 import type { GameWithPlayers } from "@/lib/queries";
 import type { Game, PlayerSessionWithPlayer } from "@/lib/types";
@@ -35,9 +36,6 @@ export function GameRow({
   const [isDeleting, startDeleteTransition] = useTransition();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const isOnline = useIsOnline();
-  const names = [game.player1, game.player2, game.player3, game.player4]
-    .map((p) => p?.name ?? "—")
-    .join(" / ");
 
   return (
     <li className="border-b border-black/10 last:border-b-0">
@@ -56,15 +54,10 @@ export function GameRow({
             className="-mx-2 flex cursor-pointer items-center justify-between gap-3 rounded-lg px-2 py-3 transition-colors hover:bg-black/[0.03]"
           >
             <div className="min-w-0">
-              <p
-                className="truncate font-bold text-black"
-                style={{
-                  fontFamily:
-                    '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-                }}
-              >
-                {names}
-              </p>
+              <Matchup
+                team1={[game.player1?.name, game.player2?.name]}
+                team2={[game.player3?.name, game.player4?.name]}
+              />
               <p className="text-xs text-black/40">
                 Game {game.game_number}
                 {game.winner_team && (
