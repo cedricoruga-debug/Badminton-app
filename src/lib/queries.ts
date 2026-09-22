@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import type {
   AppSettings,
   Game,
+  JoinRequest,
   Player,
   PlayerSessionWithPlayer,
   Session,
@@ -114,6 +115,22 @@ export async function getUnpaidPlayerSessions(
     console.error("[getUnpaidPlayerSessions] Supabase error:", error);
   }
   return (data as PlayerSessionWithPlayer[]) ?? [];
+}
+
+/** Pending self-service join requests for a session — the "Join requests"
+ * panel on the dashboard. Approved/declined ones drop out once handled. */
+export async function getPendingJoinRequests(sessionId: string): Promise<JoinRequest[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("join_requests")
+    .select("*")
+    .eq("session_id", sessionId)
+    .eq("status", "pending")
+    .order("created_at", { ascending: true });
+  if (error) {
+    console.error("[getPendingJoinRequests] Supabase error:", error);
+  }
+  return data ?? [];
 }
 
 export async function getAllPlayers(): Promise<Player[]> {

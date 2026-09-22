@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { advanceGameStatus, deleteGame } from "@/app/actions";
+import { deleteGame } from "@/app/actions";
 import { EditGameButton } from "@/app/components/EditGameButton";
 import { IconTrash } from "@/app/components/icons";
+import { queueableAdvanceGameStatus, useIsOnline } from "@/lib/offlineQueue";
 import type { GameWithPlayers } from "@/lib/queries";
 import type { Game, PlayerSessionWithPlayer } from "@/lib/types";
 
@@ -33,6 +34,7 @@ export function GameRow({
   const [isPending, startTransition] = useTransition();
   const [isDeleting, startDeleteTransition] = useTransition();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const isOnline = useIsOnline();
   const names = [game.player1, game.player2, game.player3, game.player4]
     .map((p) => p?.name ?? "—")
     .join(" / ");
@@ -63,7 +65,22 @@ export function GameRow({
               >
                 {names}
               </p>
-              <p className="text-xs text-black/40">Game {game.game_number}</p>
+              <p className="text-xs text-black/40">
+                Game {game.game_number}
+                {game.winner_team && (
+                  <>
+                    {" · "}
+                    <span className="font-medium text-emerald-700">
+                      {game.winner_team === "team1"
+                        ? `${game.player1?.name ?? "Team 1"} / ${game.player2?.name ?? ""}`
+                        : `${game.player3?.name ?? "Team 2"} / ${game.player4?.name ?? ""}`}{" "}
+                      won
+                    </span>
+                    {(game.score1 !== null || game.score2 !== null) &&
+                      ` (${game.score1 ?? "–"}-${game.score2 ?? "–"})`}
+                  </>
+                )}
+              </p>
             </div>
 
             <div className="flex flex-none items-center gap-2">
@@ -82,7 +99,7 @@ export function GameRow({
                     title={game.status === "Queued" ? "Start this game" : "Mark this game done"}
                     onClick={(e) => {
                       e.stopPropagation();
-                      startTransition(() => advanceGameStatus(game.id, game.status));
+                      startTransition(() => queueableAdvanceGameStatus(isOnline, game.id, game.status));
                     }}
                     className="whitespace-nowrap rounded border border-brand/30 px-2 py-1 text-[11px] font-medium text-brand transition-colors hover:bg-brand-light disabled:opacity-50"
                   >

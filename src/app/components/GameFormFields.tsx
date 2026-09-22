@@ -28,6 +28,78 @@ const PICKER_STATUS_STYLES = {
 
 
 /**
+ * "Magic Queue"-style auto-suggest: picks up to 4 free players for the next
+ * match instead of the queue master choosing every one by hand. Weighted
+ * by, in priority order: hasn't played yet / waited longest since their
+ * last game, then fewest games played overall as a tiebreak, while
+ * preferring not to just replay the exact same 4 who were in the last
+ * completed/ongoing game (falls back to including them anyway if there
+ * aren't 4 free alternatives). Pure function so it's easy to reason about
+ * independent of the component's render.
+ */
+function suggestNextMatch(
+  players: PlayerSessionWithPlayer[],
+  games: GameForStatus[],
+  playerStatus: Map<string, "queued" | "ongoing">
+): string[] {
+  const free = players.filter((ps) => !playerStatus.has(ps.player.id));
+  if (free.length === 0) return [];
+
+  const maxGameNumber = games.reduce((max, g) => Math.max(max, g.game_number), 0);
+
+  function waitScore(ps: PlayerSessionWithPlayer): number {
+    const played = games.filter(
+      (g) =>
+        g.status !== "Queued" &&
+        [g.player1_id, g.player2_id, g.player3_id, g.player4_id].includes(ps.player.id)
+    );
+    // Hasn't played at all yet this session — top priority, ahead of
+    // anyone who has, no matter how long ago their last game was.
+    if (played.length === 0) return Number.POSITIVE_INFINITY;
+    const lastPlayed = Math.max(...played.map((g) => g.game_number));
+    return maxGameNumber - lastPlayed;
+  }
+
+  const ranked = free
+    .map((ps) => ({ ps, wait: waitScore(ps) }))
+    .sort((a, b) => {
+      if (a.wait !== b.wait) return b.wait - a.wait;
+      return a.ps.total_games - b.ps.total_games;
+    });
+
+  const lastPlayedGame = [...games]
+    .filter((g) => g.status !== "Queued")
+    .sort((a, b) => b.game_number - a.game_number)[0];
+  const justPlayedTogether = new Set(
+    lastPlayedGame
+      ? [
+          lastPlayedGame.player1_id,
+          lastPlayedGame.player2_id,
+          lastPlayedGame.player3_id,
+          lastPlayedGame.player4_id,
+        ].filter((id): id is string => Boolean(id))
+      : []
+  );
+
+  const picked: string[] = [];
+  for (const { ps } of ranked) {
+    if (picked.length >= 4) break;
+    if (justPlayedTogether.has(ps.player.id)) continue;
+    picked.push(ps.player.id);
+  }
+  // Couldn't fill 4 without them (small free pool) — take another pass and
+  // include them rather than suggesting fewer than 4 players.
+  if (picked.length < 4) {
+    for (const { ps } of ranked) {
+      if (picked.length >= 4) break;
+      if (!picked.includes(ps.player.id)) picked.push(ps.player.id);
+    }
+  }
+
+  return picked;
+}
+
+/**
  * Shared body for the New Game and Edit Game forms. Kept as its own
  * component (rather than inline in a Modal's render prop) so its selection
  * state is a fresh mount every time the modal opens — Modal unmounts its
@@ -43,6 +115,9 @@ export function GameFormFields({
   games = [],
   defaultStatus = "Queued",
   defaultPlayerIds = [],
+  defaultWinnerTeam = null,
+  defaultScore1 = null,
+  defaultScore2 = null,
   submitLabel = "Save",
   redirectTo,
   close,
@@ -63,6 +138,11 @@ export function GameFormFields({
   games?: GameForStatus[];
   defaultStatus?: "Queued" | "Ongoing" | "Done";
   defaultPlayerIds?: string[];
+  /** 'team1' = player1+player2, 'team2' = player3+player4 — only shown/used
+   * once status is Done. */
+  defaultWinnerTeam?: "team1" | "team2" | null;
+  defaultScore1?: number | null;
+  defaultScore2?: number | null;
   submitLabel?: string;
   /** Where `action` should redirect after saving (create only — "/" by
    * default). Lets a page like Games keep you on itself after adding one. */
@@ -70,6 +150,8 @@ export function GameFormFields({
   close: () => void;
 }) {
   const [selected, setSelected] = useState<string[]>(defaultPlayerIds);
+  const [status, setStatus] = useState(defaultStatus);
+  const [winnerTeam, setWinnerTeam] = useState(defaultWinnerTeam);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [isDeleting, startDeleteTransition] = useTransition();
 
@@ -167,7 +249,8 @@ export function GameFormFields({
                 type="radio"
                 name="status"
                 value={value}
-                defaultChecked={defaultStatus === value}
+                checked={status === value}
+                onChange={() => setStatus(value)}
                 className="peer sr-only"
               />
               <span className="block cursor-pointer rounded bg-black/5 px-4 py-2 text-center text-sm font-medium text-black/60 peer-checked:bg-brand peer-checked:text-white">
@@ -178,10 +261,72 @@ export function GameFormFields({
         </div>
       </fieldset>
 
+      {/* Winner/score — optional, only meaningful once the game is Done.
+       * Doesn't block saving: a game can be marked Done with no winner
+       * recorded, same as before this existed. */}
+      {status === "Done" && (
+        <fieldset>
+          <legend className="mb-2 block text-sm font-medium">Winner (optional)</legend>
+          <div className="flex gap-2">
+            {(
+              [
+                { value: null, label: "Not recorded" },
+                { value: "team1" as const, label: "Team 1" },
+                { value: "team2" as const, label: "Team 2" },
+              ] satisfies Array<{ value: "team1" | "team2" | null; label: string }>
+            ).map(({ value, label }) => (
+              <label key={label} className="flex-1">
+                <input
+                  type="radio"
+                  name="winner_team"
+                  value={value ?? ""}
+                  checked={winnerTeam === value}
+                  onChange={() => setWinnerTeam(value)}
+                  className="peer sr-only"
+                />
+                <span className="block cursor-pointer rounded bg-black/5 px-3 py-1.5 text-center text-xs font-medium text-black/60 peer-checked:bg-brand peer-checked:text-white">
+                  {label}
+                </span>
+              </label>
+            ))}
+          </div>
+
+          <div className="mt-2 flex items-center gap-2">
+            <input
+              type="number"
+              name="score1"
+              min={0}
+              defaultValue={defaultScore1 ?? ""}
+              placeholder="Team 1 score"
+              className="w-full min-w-0 rounded border border-black/15 px-2 py-1.5 text-sm"
+            />
+            <span className="flex-none text-xs text-black/30">–</span>
+            <input
+              type="number"
+              name="score2"
+              min={0}
+              defaultValue={defaultScore2 ?? ""}
+              placeholder="Team 2 score"
+              className="w-full min-w-0 rounded border border-black/15 px-2 py-1.5 text-sm"
+            />
+          </div>
+        </fieldset>
+      )}
+
       <fieldset>
         <legend className="mb-2 flex w-full items-center justify-between text-sm font-medium">
           <span>New game (pick up to 4)</span>
-          <span className="font-normal text-black/40">{selected.length}/4</span>
+          <span className="flex items-center gap-2">
+            <button
+              type="button"
+              title="Auto-pick 4 players — weighted by who's waited longest and hasn't just played together"
+              onClick={() => setSelected(suggestNextMatch(players, games, playerStatus))}
+              className="rounded-full border border-brand/30 px-2 py-0.5 text-[11px] font-medium text-brand transition-colors hover:bg-brand-light"
+            >
+              ✨ Suggest
+            </button>
+            <span className="font-normal text-black/40">{selected.length}/4</span>
+          </span>
         </legend>
         {players.length === 0 ? (
           <p className="text-sm text-black/40">No players registered for this session yet.</p>

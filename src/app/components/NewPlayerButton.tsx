@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { createPlayer } from "@/app/actions";
+import { bulkAddPlayers, createPlayer } from "@/app/actions";
 import { SubmitButton } from "@/app/components/SubmitButton";
 import { IconUserPlus } from "@/app/components/icons";
 
@@ -13,6 +13,11 @@ type SessionOption = { id: string; session_date: string };
  * expands an inline form in place — no popup/overlay — taking over the
  * full row of the 2-column grid while open, same disclosure pattern as the
  * reference "+Add VA" card, just triggered from an icon here.
+ *
+ * Has two modes, toggled by a little tab pair at the top: "Single" (the
+ * original one-name form) and "Bulk" (paste a whole roster, one name per
+ * line — for the common case of re-registering the usual dozen-plus
+ * regulars for a new session day instead of adding them one at a time).
  */
 export function NewPlayerButton({
   sessions,
@@ -22,6 +27,7 @@ export function NewPlayerButton({
   defaultSessionId: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<"single" | "bulk">("single");
 
   if (!open) {
     return (
@@ -37,7 +43,26 @@ export function NewPlayerButton({
   return (
     <div className="col-span-2 rounded-lg border border-black/10 bg-black/[0.02] p-3 text-left">
       <div className="mb-3 flex items-center justify-between">
-        <span className="text-xs font-semibold text-brand">New player</span>
+        <div className="flex items-center gap-1 rounded-full bg-black/5 p-0.5">
+          <button
+            type="button"
+            onClick={() => setMode("single")}
+            className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
+              mode === "single" ? "bg-white text-brand shadow-sm" : "text-black/50"
+            }`}
+          >
+            Single
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("bulk")}
+            className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
+              mode === "bulk" ? "bg-white text-brand shadow-sm" : "text-black/50"
+            }`}
+          >
+            Bulk add
+          </button>
+        </div>
         <button
           type="button"
           onClick={() => setOpen(false)}
@@ -47,44 +72,91 @@ export function NewPlayerButton({
         </button>
       </div>
 
-      <form action={createPlayer} className="space-y-3">
-        <div>
-          <label className="mb-1 block text-xs font-medium text-brand">Session date</label>
-          <select
-            name="session_id"
-            defaultValue={defaultSessionId}
-            required
-            className="w-full rounded border border-black/15 bg-white px-2 py-1.5 text-sm"
-          >
-            {sessions.map((s) => (
-              <option key={s.id} value={s.id}>
-                {new Date(s.session_date).toLocaleDateString("en-US")}
-              </option>
-            ))}
-          </select>
-        </div>
+      {mode === "single" ? (
+        <form action={createPlayer} className="space-y-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-brand">Session date</label>
+            <select
+              name="session_id"
+              defaultValue={defaultSessionId}
+              required
+              className="w-full rounded border border-black/15 bg-white px-2 py-1.5 text-sm"
+            >
+              {sessions.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {new Date(s.session_date).toLocaleDateString("en-US")}
+                </option>
+              ))}
+            </select>
+          </div>
 
-        <div>
-          <label className="mb-1 block text-xs font-medium text-brand">Name</label>
-          <input
-            type="text"
-            name="name"
-            required
-            autoFocus
-            placeholder="Full name"
-            className="w-full rounded border border-black/15 bg-white px-2 py-1.5 text-sm"
-          />
-        </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-brand">Name</label>
+            <input
+              type="text"
+              name="name"
+              required
+              autoFocus
+              placeholder="Full name"
+              className="w-full rounded border border-black/15 bg-white px-2 py-1.5 text-sm"
+            />
+          </div>
 
-        <div className="flex justify-end">
-          <SubmitButton
-            className="rounded btn-brand px-3 py-1.5 text-xs font-medium text-white"
-            pendingLabel="Adding…"
-          >
-            Add player
-          </SubmitButton>
-        </div>
-      </form>
+          <div className="flex justify-end">
+            <SubmitButton
+              className="rounded btn-brand px-3 py-1.5 text-xs font-medium text-white"
+              pendingLabel="Adding…"
+            >
+              Add player
+            </SubmitButton>
+          </div>
+        </form>
+      ) : (
+        <form action={bulkAddPlayers} className="space-y-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-brand">Session date</label>
+            <select
+              name="session_id"
+              defaultValue={defaultSessionId}
+              required
+              className="w-full rounded border border-black/15 bg-white px-2 py-1.5 text-sm"
+            >
+              {sessions.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {new Date(s.session_date).toLocaleDateString("en-US")}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-brand">
+              Names — one per line
+            </label>
+            <textarea
+              name="names"
+              required
+              autoFocus
+              rows={5}
+              placeholder={"Juan Dela Cruz\nMaria Santos\nPedro Reyes"}
+              className="w-full resize-y rounded border border-black/15 bg-white px-2 py-1.5 text-sm"
+            />
+            <p className="mt-1 text-[11px] text-black/40">
+              A name already on the roster is matched and just gets registered for this session —
+              only genuinely new names create a new player.
+            </p>
+          </div>
+
+          <div className="flex justify-end">
+            <SubmitButton
+              className="rounded btn-brand px-3 py-1.5 text-xs font-medium text-white"
+              pendingLabel="Adding…"
+            >
+              Add all
+            </SubmitButton>
+          </div>
+        </form>
+      )}
     </div>
   );
 }

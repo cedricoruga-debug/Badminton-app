@@ -1,8 +1,8 @@
 "use client";
 
 import { useTransition } from "react";
-import { advanceGameStatus } from "@/app/actions";
 import { EditGameButton } from "@/app/components/EditGameButton";
+import { queueableAdvanceGameStatus, useIsOnline } from "@/lib/offlineQueue";
 import type { GameWithPlayers } from "@/lib/queries";
 import type { Game, PlayerSessionWithPlayer } from "@/lib/types";
 
@@ -13,9 +13,11 @@ type GameForStatus = Pick<Game, "id" | "game_number" | "status" | "player1_id" |
  * An Ongoing game, drawn as a little badminton court instead of a plain
  * list row — a court "card" that's actually happening right now deserves to
  * look like it. The net (the thick white line) splits it into the two
- * teams: player1 + player2 on top, player3 + player4 on the bottom, each
- * name sitting in its own corner of the court, the same 2-vs-2 layout the
- * "New Game"/edit form uses to pick players.
+ * teams left vs. right, broadcast-angle style: player1 + player2 on the
+ * left, player3 + player4 on the right, each name sitting in its own corner
+ * of the court, the same 2-vs-2 layout the "New Game"/edit form uses to pick
+ * players. Wider than tall on purpose — easier to scan at a glance and fits
+ * more courts on screen than the original portrait card did.
  *
  * Click opens the same edit popup a queued game's row does (EditGameButton
  * wraps whatever's handed to it as `children`, same pattern as GameRow) —
@@ -38,6 +40,7 @@ export function CourtBox({
   games?: GameForStatus[];
 }) {
   const [isPending, startTransition] = useTransition();
+  const isOnline = useIsOnline();
 
   return (
     <EditGameButton game={game} sessions={sessions} players={players} games={games}>
@@ -58,15 +61,16 @@ export function CourtBox({
             Game {game.game_number}
           </p>
 
-          {/* The court: two halves split by the net, 2 players a side. Taller
-           * than it is wide, like a real court, with room for the name to
-           * wrap to a second line rather than truncate. */}
-          <div className="flex min-h-[220px] flex-1 flex-col bg-emerald-600">
-            <div className="grid flex-1 grid-cols-2 divide-x divide-white/40 border-b-[3px] border-white/90">
+          {/* The court: two halves split by the net, 2 players a side. Wider
+           * than it is tall — the net runs down the middle instead of across
+           * it — with room for the name to wrap to a second line rather than
+           * truncate. */}
+          <div className="flex min-h-[140px] flex-1 flex-row bg-emerald-600">
+            <div className="grid flex-1 grid-rows-2 divide-y divide-white/40 border-r-[3px] border-white/90">
               <PlayerCell name={game.player1?.name} />
               <PlayerCell name={game.player2?.name} />
             </div>
-            <div className="grid flex-1 grid-cols-2 divide-x divide-white/40">
+            <div className="grid flex-1 grid-rows-2 divide-y divide-white/40">
               <PlayerCell name={game.player3?.name} />
               <PlayerCell name={game.player4?.name} />
             </div>
@@ -78,7 +82,7 @@ export function CourtBox({
             title="Mark this game done"
             onClick={(e) => {
               e.stopPropagation();
-              startTransition(() => advanceGameStatus(game.id, game.status));
+              startTransition(() => queueableAdvanceGameStatus(isOnline, game.id, game.status));
             }}
             className="flex-none bg-amber-400 px-1.5 py-1.5 text-center text-xs font-semibold text-amber-900 transition-colors hover:bg-amber-300 disabled:opacity-50"
           >

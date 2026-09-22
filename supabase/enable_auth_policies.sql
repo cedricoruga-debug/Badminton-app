@@ -29,6 +29,9 @@ drop policy if exists "Allow all read (assets)" on storage.objects;
 drop policy if exists "Allow all insert (assets)" on storage.objects;
 drop policy if exists "Allow all update (assets)" on storage.objects;
 drop policy if exists "Allow all delete (assets)" on storage.objects;
+-- also drop the *current* names this block itself creates — without this,
+-- re-running the script a second time fails with "policy ... already
+-- exists" instead of being a no-op like every other policy in this file.
 drop policy if exists "Require login to write (assets)" on storage.objects;
 drop policy if exists "Require login to update (assets)" on storage.objects;
 drop policy if exists "Require login to delete (assets)" on storage.objects;

@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { IconShuttle } from "@/app/components/icons";
+import { OfflineBanner } from "@/app/components/OfflineBanner";
 import { SidePanel } from "@/app/components/SidePanel";
 import { createClient } from "@/lib/supabase/client";
 import type { AppSettings } from "@/lib/types";
@@ -11,7 +12,14 @@ const APP_TITLE = "Queuing App by Ced";
 
 /** Every table a page on this site reads from — a change to any of them
  * could be showing on someone else's screen right now. */
-const WATCHED_TABLES = ["players", "sessions", "games", "player_sessions", "app_settings"] as const;
+const WATCHED_TABLES = [
+  "players",
+  "sessions",
+  "games",
+  "player_sessions",
+  "app_settings",
+  "join_requests",
+] as const;
 
 /** If several rows change at once (e.g. saving a game touches both `games`
  * and `player_sessions`), coalesce them into one refresh instead of one per
@@ -47,11 +55,13 @@ const MIN_MS_BETWEEN_REFOCUS_REFRESH = 5000;
  *    back. Refreshing on refocus catches anything missed while the socket
  *    was down, regardless of whether Realtime is configured at all.
  */
-function useLiveRefresh() {
+function useLiveRefresh(enabled: boolean) {
   const router = useRouter();
   const lastRefresh = useRef(0);
 
   useEffect(() => {
+    if (!enabled) return;
+
     const supabase = createClient();
     let coalesceTimer: ReturnType<typeof setTimeout> | null = null;
     let hasSubscribedOnce = false;
@@ -96,14 +106,18 @@ function useLiveRefresh() {
       window.removeEventListener("focus", onRefocus);
       supabase.removeChannel(channel);
     };
-  }, [router]);
+  }, [router, enabled]);
 }
 
+/** Pages that render full-screen with none of the usual chrome — each has
+ * its own centered card layout, and a visitor there either isn't signed in
+ * yet (`/login`) or never will be (`/join`, the public self-service page),
+ * so the nav links to pages they can't use would just be confusing. */
+const CHROMELESS_PATHS = ["/login", "/join"];
+
 /**
- * Wraps every page with the header + right-hand icon rail — except
- * `/login`, which renders full-screen with none of that chrome (it has its
- * own centered card layout, and showing nav links to pages the visitor
- * can't use yet would be confusing).
+ * Wraps every page with the header + right-hand icon rail — except the
+ * chromeless pages above.
  */
 export function AppChrome({
   settings,
@@ -115,9 +129,16 @@ export function AppChrome({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  useLiveRefresh();
+  const isChromeless = CHROMELESS_PATHS.includes(pathname);
 
-  if (pathname === "/login") {
+  // Realtime subscribes to tables an anonymous /join visitor has no read
+  // access to (RLS) — pointless for them and just noise/errors in the
+  // console, so only signed-in pages (i.e. never the chromeless ones) run
+  // it. Hooks can't be called conditionally, so this guards *inside*
+  // useLiveRefresh's effect instead of skipping the call itself.
+  useLiveRefresh(!isChromeless);
+
+  if (isChromeless) {
     return <>{children}</>;
   }
 
@@ -134,6 +155,9 @@ export function AppChrome({
         </span>
         <h1 className="text-lg font-semibold">{APP_TITLE}</h1>
       </header>
+      <div className="sticky top-[60px] z-40">
+        <OfflineBanner />
+      </div>
       <div className="flex flex-1">
         {/* pb-20 clears the fixed bottom nav bar on mobile; not needed once
          * that bar disappears in favor of the desktop side rail at md. */}

@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { markPaid, removePlayerFromSession, setDoneForSession, unmarkPaid } from "@/app/actions";
+import { removePlayerFromSession, setDoneForSession, setPlayerDiscount, unmarkPaid } from "@/app/actions";
 import { Modal } from "@/app/components/Modal";
 import { IconPeso, IconPhone, IconTrash } from "@/app/components/icons";
+import { queueableMarkPaid, useIsOnline } from "@/lib/offlineQueue";
 import type { GameWithPlayers } from "@/lib/queries";
 import type { PlayerSessionWithPlayer } from "@/lib/types";
 
@@ -29,6 +30,16 @@ export function PlayerSessionRow({
   const [isPending, startTransition] = useTransition();
   const [payPending, startPayTransition] = useTransition();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [discountPending, startDiscountTransition] = useTransition();
+  const isOnline = useIsOnline();
+  const [editingDiscount, setEditingDiscount] = useState(false);
+  const [discountDraft, setDiscountDraft] = useState(String(ps.discount_percent));
+
+  function saveDiscount() {
+    const value = Number(discountDraft);
+    startDiscountTransition(() => setPlayerDiscount(ps.id, Number.isFinite(value) ? value : 0));
+    setEditingDiscount(false);
+  }
 
   const playedGames = games
     .filter(
@@ -124,7 +135,7 @@ export function PlayerSessionRow({
                         title="Mark paid — Cash"
                         onClick={(e) => {
                           e.stopPropagation();
-                          startPayTransition(() => markPaid(ps.id, "Cash"));
+                          startPayTransition(() => queueableMarkPaid(isOnline, ps.id, "Cash"));
                         }}
                         className="flex h-6 w-6 items-center justify-center rounded-full bg-green-100 text-green-700 transition-colors hover:bg-green-200 disabled:opacity-50"
                       >
@@ -135,7 +146,7 @@ export function PlayerSessionRow({
                         title="Mark paid — GCash"
                         onClick={(e) => {
                           e.stopPropagation();
-                          startPayTransition(() => markPaid(ps.id, "Gcash"));
+                          startPayTransition(() => queueableMarkPaid(isOnline, ps.id, "Gcash"));
                         }}
                         className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-blue-700 transition-colors hover:bg-blue-200 disabled:opacity-50"
                       >
@@ -166,6 +177,61 @@ export function PlayerSessionRow({
                 <dd className="text-base font-semibold">₱{ps.payable.toFixed(2)}</dd>
               </div>
             </dl>
+
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wide text-black/40">Discount</p>
+                {!editingDiscount && (
+                  <button
+                    type="button"
+                    disabled={discountPending}
+                    onClick={() => {
+                      setDiscountDraft(String(ps.discount_percent));
+                      setEditingDiscount(true);
+                    }}
+                    className="text-xs font-medium text-brand hover:underline disabled:opacity-50"
+                  >
+                    {ps.discount_percent > 0 ? "Edit" : "Add discount"}
+                  </button>
+                )}
+              </div>
+              {editingDiscount ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    autoFocus
+                    value={discountDraft}
+                    onChange={(e) => setDiscountDraft(e.target.value)}
+                    className="w-20 rounded border border-black/15 px-2 py-1 text-sm"
+                  />
+                  <span className="text-sm text-black/50">% off court + shuttle cost</span>
+                  <button
+                    type="button"
+                    onClick={saveDiscount}
+                    className="rounded btn-brand px-2 py-1 text-xs font-medium text-white"
+                  >
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingDiscount(false)}
+                    className="text-xs font-medium text-black/50 hover:text-brand"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <p className="text-sm text-black/60">
+                  {ps.discount_percent > 0 ? (
+                    <span className="font-medium text-emerald-700">{ps.discount_percent}% off</span>
+                  ) : (
+                    "No discount"
+                  )}
+                </p>
+              )}
+            </div>
 
             <div>
               <div className="mb-2 flex items-center justify-between">
@@ -214,7 +280,7 @@ export function PlayerSessionRow({
                   <button
                     type="button"
                     disabled={payPending}
-                    onClick={() => startPayTransition(() => markPaid(ps.id, "Cash"))}
+                    onClick={() => startPayTransition(() => queueableMarkPaid(isOnline, ps.id, "Cash"))}
                     className="flex items-center gap-1.5 rounded-full bg-green-100 px-3 py-1.5 text-xs font-medium text-green-700 transition-colors hover:bg-green-200 disabled:opacity-50"
                   >
                     <IconPeso className="h-3.5 w-3.5" />
@@ -223,7 +289,7 @@ export function PlayerSessionRow({
                   <button
                     type="button"
                     disabled={payPending}
-                    onClick={() => startPayTransition(() => markPaid(ps.id, "Gcash"))}
+                    onClick={() => startPayTransition(() => queueableMarkPaid(isOnline, ps.id, "Gcash"))}
                     className="flex items-center gap-1.5 rounded-full bg-blue-100 px-3 py-1.5 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-200 disabled:opacity-50"
                   >
                     <IconPhone className="h-3.5 w-3.5" />

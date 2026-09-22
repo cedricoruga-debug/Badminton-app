@@ -47,6 +47,9 @@ export function EditGameButton({
           games={games}
           defaultStatus={game.status}
           defaultPlayerIds={defaultPlayerIds}
+          defaultWinnerTeam={game.winner_team}
+          defaultScore1={game.score1}
+          defaultScore2={game.score2}
           submitLabel="Save changes"
           close={close}
         />

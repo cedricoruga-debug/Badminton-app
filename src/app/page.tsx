@@ -4,6 +4,7 @@ import {
   getAppSettings,
   getGames,
   getLatestSession,
+  getPendingJoinRequests,
   getPlayerSessions,
   getQueuedGames,
   getSessionGameCount,
@@ -12,6 +13,8 @@ import {
 import { PlayerSessionRow } from "@/app/components/PlayerSessionRow";
 import { GameRow } from "@/app/components/GameRow";
 import { CourtBox } from "@/app/components/CourtBox";
+import { JoinCodeCard } from "@/app/components/JoinCodeCard";
+import { JoinRequestsPanel } from "@/app/components/JoinRequestsPanel";
 import { NewGameButton } from "@/app/components/NewGameButton";
 import { NewPlayerButton } from "@/app/components/NewPlayerButton";
 import { NewSessionButton } from "@/app/components/NewSessionButton";
@@ -28,15 +31,16 @@ export default async function Home() {
   const settings = await getAppSettings();
   const session = await getLatestSession();
   const sessions = await getAllSessions();
-  const [unpaid, queuedGames, totalGameCount, sessionPlayers, allSessionGames] = session
+  const [unpaid, queuedGames, totalGameCount, sessionPlayers, allSessionGames, pendingJoinRequests] = session
     ? await Promise.all([
         getUnpaidPlayerSessions(session.id),
         getQueuedGames(session.id),
         getSessionGameCount(session.id),
         getPlayerSessions(session.id),
         getGames(session.id),
+        getPendingJoinRequests(session.id),
       ])
-    : [[], [], 0, [], []];
+    : [[], [], 0, [], [], []];
 
   // Ongoing games get drawn as courts up top (see CourtBox); games that
   // haven't started yet stay in the plain list below. getQueuedGames
@@ -46,14 +50,27 @@ export default async function Home() {
   const notStartedGames = queuedGames.filter((g) => g.status !== "Ongoing");
 
   // A few extra numbers for the Details panel below the QR code — all
-  // derived from sessionPlayers, already fetched above, no extra queries.
+  // derived from sessionPlayers/allSessionGames, already fetched above, no
+  // extra queries.
   const totalPlayers = sessionPlayers.length;
   const paidPlayersCount = sessionPlayers.filter((ps) => ps.payment_method !== null).length;
-  const mostGamesPlayed = sessionPlayers.reduce((max, ps) => Math.max(max, ps.total_games), 0);
+
+  // MVP = most wins, not most games played — winner_team is optional per
+  // game (see GameFormFields), so a session with nothing recorded yet just
+  // shows no MVP rather than falling back to games-played.
+  const winCounts = new Map<string, number>();
+  for (const g of allSessionGames) {
+    if (!g.winner_team) continue;
+    const winners = g.winner_team === "team1" ? [g.player1_id, g.player2_id] : [g.player3_id, g.player4_id];
+    for (const playerId of winners) {
+      if (playerId) winCounts.set(playerId, (winCounts.get(playerId) ?? 0) + 1);
+    }
+  }
+  const mostWins = Math.max(0, ...Array.from(winCounts.values()));
   const mvpNames =
-    mostGamesPlayed > 0
+    mostWins > 0
       ? sessionPlayers
-          .filter((ps) => ps.total_games === mostGamesPlayed)
+          .filter((ps) => (winCounts.get(ps.player_id) ?? 0) === mostWins)
           .map((ps) => ps.player.name)
           .join(" & ")
       : null;
@@ -117,6 +134,12 @@ export default async function Home() {
         </div>
       </div>
 
+      {session && pendingJoinRequests.length > 0 && (
+        <div className="px-4 pt-4 landscape:pt-4">
+          <JoinRequestsPanel sessionId={session.id} requests={pendingJoinRequests} />
+        </div>
+      )}
+
       <main className="flex flex-1 flex-col gap-4 px-4 pb-4 pt-4 landscape:grid landscape:min-h-0 landscape:grid-cols-[0.5fr_1.8fr_0.8fr]">
         {/* Games Queued — what's left to play this session. Stays first in
          * the markup (so portrait/mobile shows it on top, per an earlier
@@ -132,7 +155,7 @@ export default async function Home() {
           </h3>
 
           {ongoingGames.length > 0 && (
-            <div className="mb-3 grid flex-none grid-cols-4 gap-2">
+            <div className="mb-3 grid flex-none grid-cols-1 gap-2 min-[420px]:grid-cols-2">
               {ongoingGames.map((g) => (
                 <CourtBox
                   key={g.id}
@@ -217,6 +240,14 @@ export default async function Home() {
                 {session ? new Date(session.session_date).toLocaleDateString("en-US") : "—"}
               </dd>
             </div>
+            {session && (
+              <div className="flex items-center justify-between">
+                <dt className="text-black/50">Join code</dt>
+                <dd>
+                  <JoinCodeCard sessionId={session.id} joinCode={session.join_code} />
+                </dd>
+              </div>
+            )}
             <div className="flex justify-between">
               <dt className="text-black/50">Total games</dt>
               <dd className="font-medium">{totalGameCount}</dd>

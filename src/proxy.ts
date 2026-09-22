@@ -5,9 +5,14 @@ import { createServerClient } from "@supabase/ssr";
 /**
  * Gatekeeper for the whole app — Next.js 16 renamed `middleware.ts` to
  * `proxy.ts` (same mechanism, new name/export). Every request except
- * `/login` requires a signed-in Supabase user; unauthenticated visitors are
- * bounced to `/login`, and a signed-in user hitting `/login` is bounced to
- * `/`. This is what makes the deployed app private instead of open to
+ * `/login` and `/join` requires a signed-in Supabase user; unauthenticated
+ * visitors are bounced to `/login`, and a signed-in user hitting `/login`
+ * (or `/join` — an admin has no reason to be there) is bounced to `/`.
+ * `/join` is the one deliberately public page: the self-service page a
+ * player without an account uses to request a spot in a session by code
+ * (see submitJoinRequest in actions.ts) — RLS on join_requests is what
+ * actually limits what an anonymous visitor there can do, not this check.
+ * This proxy is what makes every other page private instead of open to
  * anyone who finds the URL.
  *
  * Uses `getSession()` (reads the session straight out of the request
@@ -21,7 +26,7 @@ import { createServerClient } from "@supabase/ssr";
  * for this small private app is low (worst case is a confusing error
  * instead of a redirect, not exposed data).
  */
-const PUBLIC_PATHS = ["/login"];
+const PUBLIC_PATHS = ["/login", "/join"];
 
 export async function proxy(request: NextRequest) {
   // No Supabase configured yet (first-run / local setup) — let the

@@ -235,14 +235,63 @@ async function registerPlayerForSession(
 }
 
 /**
+ * Look up the roster by name (case-insensitive) and reuse that player if
+ * found, only inserting a new `players` row when the name is genuinely new.
+ * Shared by createPlayer and bulkAddPlayers — both hit the same
+ * `players_name_key` duplicate-key problem otherwise, since most
+ * submissions are actually a returning player being registered for a new
+ * date, not a brand-new person.
+ */
+async function findOrCreatePlayerByName(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  name: string
+): Promise<string> {
+  const { data: existing, error: lookupError } = await supabase
+    .from("players")
+    .select("id")
+    .ilike("name", name)
+    .maybeSingle();
+  if (lookupError) throw new Error(lookupError.message);
+
+  if (existing) return existing.id;
+
+  const { data: player, error } = await supabase
+    .from("players")
+    .insert({ name })
+    .select("id")
+    .single();
+  if (error) throw new Error(error.message);
+  return player.id;
+}
+
+/**
+ * Register a player for a session unless they're already on it — a plain
+ * registerPlayerForSession call assumes a fresh registration and would
+ * double-count the court share / crash on the player_sessions unique
+ * constraint if the player (found or created above) turns out to already be
+ * registered.
+ */
+async function registerIfNotAlready(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  sessionId: string,
+  playerId: string
+) {
+  const { count: alreadyRegistered, error: existingRegError } = await supabase
+    .from("player_sessions")
+    .select("id", { count: "exact", head: true })
+    .eq("session_id", sessionId)
+    .eq("player_id", playerId);
+  if (existingRegError) throw new Error(existingRegError.message);
+
+  if (!alreadyRegistered) {
+    await registerPlayerForSession(supabase, sessionId, playerId);
+  }
+}
+
+/**
  * Add a player to a session via the "New player" / "Add player" forms.
- * Most submissions here are actually a returning player being registered
- * for a new date, not a brand-new person — so this looks up the roster by
- * name (case-insensitive) first and reuses that player if found, only
- * inserting a new `players` row when the name is genuinely new. Without
- * this, typing an existing player's name crashed with a duplicate-key
- * error on `players_name_key`. Redirects to "/" by default, or wherever
- * `redirect_to` says (e.g. back to the Sessions page you added them from).
+ * Redirects to "/" by default, or wherever `redirect_to` says (e.g. back to
+ * the Sessions page you added them from).
  */
 export async function createPlayer(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
@@ -251,43 +300,53 @@ export async function createPlayer(formData: FormData) {
   if (!name) throw new Error("Name is required");
 
   const supabase = await createClient();
-
-  const { data: existing, error: lookupError } = await supabase
-    .from("players")
-    .select("id")
-    .ilike("name", name)
-    .maybeSingle();
-  if (lookupError) throw new Error(lookupError.message);
-
-  let playerId: string;
-  if (existing) {
-    playerId = existing.id;
-  } else {
-    const { data: player, error } = await supabase
-      .from("players")
-      .insert({ name })
-      .select("id")
-      .single();
-    if (error) throw new Error(error.message);
-    playerId = player.id;
-  }
+  const playerId = await findOrCreatePlayerByName(supabase, name);
 
   if (sessionId) {
-    // Guard against re-registering someone already in this session (e.g.
-    // the name matched an existing player who's already on today's list) —
-    // registerPlayerForSession assumes a fresh registration and would
-    // double-count the court share / crash on the player_sessions unique
-    // constraint otherwise.
-    const { count: alreadyRegistered, error: existingRegError } = await supabase
-      .from("player_sessions")
-      .select("id", { count: "exact", head: true })
-      .eq("session_id", sessionId)
-      .eq("player_id", playerId);
-    if (existingRegError) throw new Error(existingRegError.message);
+    await registerIfNotAlready(supabase, sessionId, playerId);
+  }
 
-    if (!alreadyRegistered) {
-      await registerPlayerForSession(supabase, sessionId, playerId);
-    }
+  revalidatePath("/");
+  revalidatePath("/sessions");
+  redirect(redirectTo);
+}
+
+/**
+ * Add a whole roster at once — the "Bulk add" mode of the New Player form,
+ * one name per line pasted into a textarea instead of adding players one at
+ * a time. Blank lines are skipped; duplicate lines (someone pasted the same
+ * name twice) are deduped case-insensitively so they don't get registered
+ * twice in the same submission. Each name goes through the same
+ * find-or-create + register logic as a single add, so a list mixing
+ * brand-new names with returning regulars just works.
+ */
+export async function bulkAddPlayers(formData: FormData) {
+  const raw = String(formData.get("names") ?? "");
+  const sessionId = String(formData.get("session_id") ?? "");
+  const redirectTo = String(formData.get("redirect_to") ?? "/");
+  if (!sessionId) throw new Error("Missing session");
+
+  const seen = new Set<string>();
+  const names = raw
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => {
+      if (!line) return false;
+      const key = line.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  if (names.length === 0) throw new Error("Paste at least one name");
+
+  const supabase = await createClient();
+
+  // One name at a time, not Promise.all — registerIfNotAlready reads and
+  // then writes the session's player_count, so two of these racing would
+  // read the same stale count and stomp on each other's court-share split.
+  for (const name of names) {
+    const playerId = await findOrCreatePlayerByName(supabase, name);
+    await registerIfNotAlready(supabase, sessionId, playerId);
   }
 
   revalidatePath("/");
@@ -329,6 +388,28 @@ export async function removePlayerFromSession(playerSessionId: string, sessionId
     .update({ court_share: session.court_share_per_player })
     .eq("session_id", sessionId);
   if (rebalanceError) throw new Error(rebalanceError.message);
+
+  revalidatePath("/");
+  revalidatePath("/sessions");
+  revalidatePath("/player-sessions");
+}
+
+/**
+ * Set (or clear) a player's discount for a session — the "Discount" editor
+ * in their popup. A flat percentage off the court+shuttle cost, applied by
+ * the `payable` generated column itself (see schema.sql), so this just
+ * writes the one number; nothing here needs to touch court_share or
+ * recompute anything else.
+ */
+export async function setPlayerDiscount(playerSessionId: string, discountPercent: number) {
+  const clamped = Math.min(100, Math.max(0, Math.round(discountPercent)));
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("player_sessions")
+    .update({ discount_percent: clamped })
+    .eq("id", playerSessionId);
+  if (error) throw new Error(error.message);
 
   revalidatePath("/");
   revalidatePath("/sessions");
@@ -424,6 +505,29 @@ export async function updateAppSettings(formData: FormData) {
 const SHUTTLES_PER_TUBE = 12;
 
 /**
+ * A fresh 6-digit code, checked against the database so it can't collide
+ * with another session's — generated in code rather than a DB default so a
+ * collision is just "try again," not a failed insert to recover from.
+ * Sessions are created rarely (once a game day), so the extra round trip
+ * per attempt is a non-issue; 20 tries against a 6-digit space is
+ * effectively certain to succeed long before running out.
+ */
+async function generateUniqueJoinCode(
+  supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<string> {
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const { count, error } = await supabase
+      .from("sessions")
+      .select("id", { count: "exact", head: true })
+      .eq("join_code", code);
+    if (error) throw new Error(error.message);
+    if (!count) return code;
+  }
+  throw new Error("Could not generate a unique join code — try again.");
+}
+
+/**
  * Create a brand-new session / game day (the "New Session" shortcut).
  * player_count isn't collected here — it starts at 0 and grows on its own
  * as players are registered for the session (see registerPlayerForSession),
@@ -439,17 +543,115 @@ export async function createSession(formData: FormData) {
   const shuttlesPerTube = SHUTTLES_PER_TUBE;
 
   const supabase = await createClient();
+  const joinCode = await generateUniqueJoinCode(supabase);
+
   const { error } = await supabase.from("sessions").insert({
     session_date: sessionDate,
     hours,
     fee_per_hour: feePerHour,
     shuttle_tube_cost: shuttleTubeCost,
     shuttles_per_tube: shuttlesPerTube,
+    join_code: joinCode,
   });
 
   if (error) throw new Error(error.message);
   revalidatePath("/");
   redirect("/");
+}
+
+/**
+ * Submit a self-service join request — the public /join page's whole job.
+ * Called directly by that (client) page rather than as a <form action>, so
+ * it can be awaited in a try/catch and show a friendly inline error instead
+ * of crashing to Next.js's generic error screen on a bad code (this page is
+ * the one place in the app a random visitor, not just Ced's regulars, might
+ * land and mistype something).
+ *
+ * Deliberately does NOT register the player itself — find_session_by_join_code
+ * is the only thing an anonymous caller can read (a security-definer
+ * function returning just enough to confirm "you're about to join Sat, Oct
+ * 4", not the sessions table itself), and join_requests is the only table
+ * anon can write to (see schema.sql). Actually registering them happens in
+ * approveJoinRequest, run by a logged-in queue master.
+ */
+export async function submitJoinRequest(joinCode: string, playerName: string) {
+  const code = joinCode.trim();
+  const name = playerName.trim();
+  if (!code) throw new Error("Enter the session code.");
+  if (!name) throw new Error("Enter your name.");
+
+  const supabase = await createClient();
+
+  const { data: matches, error: lookupError } = await supabase.rpc("find_session_by_join_code", {
+    code,
+  });
+  if (lookupError) throw new Error(lookupError.message);
+  const session = matches?.[0];
+  if (!session) {
+    throw new Error("That code doesn't match an open session — double-check it with the queue master.");
+  }
+
+  const { error } = await supabase.from("join_requests").insert({
+    session_id: session.id,
+    player_name: name,
+  });
+  if (error) throw new Error(error.message);
+
+  return { sessionDate: session.session_date as string };
+}
+
+/**
+ * Approve a pending join request — registers the requester the same way
+ * any other player add does (findOrCreatePlayerByName + registerIfNotAlready,
+ * so a request from someone already on the roster just re-registers them
+ * instead of creating a duplicate `players` row), then marks the request
+ * approved so it drops off the pending list.
+ */
+export async function approveJoinRequest(requestId: string, sessionId: string, playerName: string) {
+  const supabase = await createClient();
+
+  const playerId = await findOrCreatePlayerByName(supabase, playerName);
+  await registerIfNotAlready(supabase, sessionId, playerId);
+
+  const { error } = await supabase
+    .from("join_requests")
+    .update({ status: "approved" })
+    .eq("id", requestId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/");
+}
+
+/** Decline a pending join request — doesn't touch the roster at all, just
+ * drops it off the pending list. */
+export async function declineJoinRequest(requestId: string) {
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("join_requests")
+    .update({ status: "declined" })
+    .eq("id", requestId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/");
+}
+
+/**
+ * Backfill a join_code for a session that predates this feature (join_code
+ * is nullable for exactly this reason — see schema.sql). Surfaced as a
+ * "Generate join code" button on the dashboard for any session missing one.
+ */
+export async function backfillSessionJoinCode(sessionId: string) {
+  const supabase = await createClient();
+  const joinCode = await generateUniqueJoinCode(supabase);
+
+  const { error } = await supabase
+    .from("sessions")
+    .update({ join_code: joinCode })
+    .eq("id", sessionId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/");
 }
 
 /** Edit an existing session's cost inputs (from the Sessions page). The date
@@ -511,6 +713,20 @@ function parseGameStatus(value: FormDataEntryValue | null): "Queued" | "Ongoing"
   return s === "Ongoing" || s === "Done" ? s : "Queued";
 }
 
+function parseWinnerTeam(value: FormDataEntryValue | null): "team1" | "team2" | null {
+  const s = String(value ?? "");
+  return s === "team1" || s === "team2" ? s : null;
+}
+
+/** Blank/unparseable input means "no score entered" (null), not 0. */
+function parseScore(value: FormDataEntryValue | null): number | null {
+  if (value === null) return null;
+  const s = String(value).trim();
+  if (s === "") return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
+
 /**
  * Log a new game (the "New Game" shortcut, on the dashboard or the Games
  * page). The "date" field is really a session picker — its options are
@@ -522,6 +738,9 @@ export async function createGame(formData: FormData) {
   const sessionId = String(formData.get("session_id") ?? "");
   const status = parseGameStatus(formData.get("status"));
   const playerIds = formData.getAll("player_id").map(String).filter(Boolean).slice(0, 4);
+  const winnerTeam = parseWinnerTeam(formData.get("winner_team"));
+  const score1 = parseScore(formData.get("score1"));
+  const score2 = parseScore(formData.get("score2"));
   const redirectTo = String(formData.get("redirect_to") ?? "/");
   if (!sessionId) throw new Error("Missing session");
 
@@ -542,6 +761,11 @@ export async function createGame(formData: FormData) {
     player2_id: playerIds[1] ?? null,
     player3_id: playerIds[2] ?? null,
     player4_id: playerIds[3] ?? null,
+    // Only meaningful once the game is Done — a Queued/Ongoing game just
+    // stores nulls here, same as never having set them.
+    winner_team: status === "Done" ? winnerTeam : null,
+    score1: status === "Done" ? score1 : null,
+    score2: status === "Done" ? score2 : null,
   });
 
   if (error) throw new Error(error.message);
@@ -604,6 +828,9 @@ export async function updateGame(formData: FormData) {
   const sessionId = String(formData.get("session_id") ?? "");
   const status = parseGameStatus(formData.get("status"));
   const playerIds = formData.getAll("player_id").map(String).filter(Boolean).slice(0, 4);
+  const winnerTeam = parseWinnerTeam(formData.get("winner_team"));
+  const score1 = parseScore(formData.get("score1"));
+  const score2 = parseScore(formData.get("score2"));
   if (!gameId || !sessionId) throw new Error("Missing game or session");
 
   const supabase = await createClient();
@@ -635,6 +862,11 @@ export async function updateGame(formData: FormData) {
       player2_id: playerIds[1] ?? null,
       player3_id: playerIds[2] ?? null,
       player4_id: playerIds[3] ?? null,
+      // Only meaningful once the game is Done — moving a game back to
+      // Queued/Ongoing clears out any winner/score it had.
+      winner_team: status === "Done" ? winnerTeam : null,
+      score1: status === "Done" ? score1 : null,
+      score2: status === "Done" ? score2 : null,
     })
     .eq("id", gameId);
 
