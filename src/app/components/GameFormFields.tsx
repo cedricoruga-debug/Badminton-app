@@ -44,10 +44,17 @@ const PICKER_STATUS_STYLES = {
  * elsewhere (spreads the *upcoming* queue fairly instead of only caring
  * who's free this exact instant), then hasn't played yet / waited longest
  * since their last game, then fewest games played overall as a final
- * tiebreak — while preferring not to just replay the exact same 4 who were
- * in the last completed/ongoing game (falls back to including them anyway
- * if there aren't 4 alternatives). Pure function so it's easy to reason
- * about independent of the component's render.
+ * tiebreak. Two anti-repeat passes sit on top of that ranking: it first
+ * skips anyone currently mid-game on any court (not just the most
+ * recently numbered one — a queue master running several courts at once
+ * shouldn't get handed someone who's literally out there right now), and
+ * if the resulting foursome still turns out to be the exact same 4 people
+ * as another already-queued or ongoing game (just re-paired), it swaps
+ * one of them out for the next-best alternative so it doesn't suggest a
+ * game that's already effectively on the board. Both skips fall back to
+ * allowing the repeat rather than suggesting fewer than 4 players, for a
+ * small enough roster that avoiding it isn't possible. Pure function so
+ * it's easy to reason about independent of the component's render.
  */
 function suggestNextMatch(
   players: PlayerSessionWithPlayer[],
@@ -93,32 +100,59 @@ function suggestNextMatch(
       return a.ps.total_games - b.ps.total_games;
     });
 
-  const lastPlayedGame = [...games]
-    .filter((g) => g.status !== "Queued")
-    .sort((a, b) => b.game_number - a.game_number)[0];
-  const justPlayedTogether = new Set(
-    lastPlayedGame
-      ? [
-          lastPlayedGame.player1_id,
-          lastPlayedGame.player2_id,
-          lastPlayedGame.player3_id,
-          lastPlayedGame.player4_id,
-        ].filter((id): id is string => Boolean(id))
-      : []
+  // Everyone currently on a court right now, across every Ongoing game —
+  // not just whichever one happens to have the highest game number.
+  const currentlyOnCourt = new Set(
+    games
+      .filter((g) => g.status === "Ongoing")
+      .flatMap((g) => [g.player1_id, g.player2_id, g.player3_id, g.player4_id])
+      .filter((id): id is string => Boolean(id))
   );
 
-  const picked: string[] = [];
-  for (const { ps } of ranked) {
-    if (picked.length >= 4) break;
-    if (justPlayedTogether.has(ps.player.id)) continue;
-    picked.push(ps.player.id);
-  }
-  // Couldn't fill 4 without them (small free pool) — take another pass and
-  // include them rather than suggesting fewer than 4 players.
-  if (picked.length < 4) {
+  function pickFour(exclude: Set<string>): string[] {
+    const picked: string[] = [];
     for (const { ps } of ranked) {
       if (picked.length >= 4) break;
-      if (!picked.includes(ps.player.id)) picked.push(ps.player.id);
+      if (exclude.has(ps.player.id)) continue;
+      picked.push(ps.player.id);
+    }
+    // Couldn't fill 4 without them (small free pool) — take another pass
+    // and include them rather than suggesting fewer than 4 players.
+    if (picked.length < 4) {
+      for (const { ps } of ranked) {
+        if (picked.length >= 4) break;
+        if (!picked.includes(ps.player.id)) picked.push(ps.player.id);
+      }
+    }
+    return picked;
+  }
+
+  let picked = pickFour(currentlyOnCourt);
+
+  // Order-independent "who's in this game" fingerprint for every other
+  // active (not Done, not this game) game — so re-pairing the exact same
+  // 4 people differently still counts as suggesting a game that's already
+  // on the board.
+  function rosterSignature(ids: (string | null)[]): string {
+    return ids
+      .filter((id): id is string => Boolean(id))
+      .sort()
+      .join("|");
+  }
+  const activeRosterSignatures = new Set(
+    games
+      .filter((g) => g.id !== gameId && g.status !== "Done")
+      .map((g) => rosterSignature([g.player1_id, g.player2_id, g.player3_id, g.player4_id]))
+  );
+
+  if (picked.length === 4 && activeRosterSignatures.has(rosterSignature(picked))) {
+    for (const { ps } of ranked) {
+      if (picked.includes(ps.player.id) || currentlyOnCourt.has(ps.player.id)) continue;
+      const swapped = [...picked.slice(0, 3), ps.player.id];
+      if (!activeRosterSignatures.has(rosterSignature(swapped))) {
+        picked = swapped;
+        break;
+      }
     }
   }
 

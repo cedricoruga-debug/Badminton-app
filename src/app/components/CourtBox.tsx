@@ -21,11 +21,14 @@ type GameForStatus = Pick<Game, "id" | "game_number" | "status" | "player1_id" |
  *
  * Each half is its own tap target — a shortcut for the single most common
  * thing that happens to an Ongoing game: it ends, and one side won. Tap a
- * side to pick it (tapping the other side switches; tapping the same side
- * again un-picks it), then Confirm to mark the game Done with that team as
- * winner, no trip through the Edit Game popup needed. That popup — opened
- * from the header bar's pencil — is still there for anything this shortcut
- * doesn't cover: swapping a player, correcting a winner, adding a score, or
+ * side and that same half turns into its own Confirm/Cancel — the
+ * confirmation lives right where you tapped, not in a shared strip
+ * somewhere else on the card, so it's obvious which side you're about to
+ * commit. Tapping the *other* side switches to it instead (no need to
+ * cancel first). Confirm marks the game Done with that team as winner, no
+ * trip through the Edit Game popup needed. That popup — opened from the
+ * header bar's pencil — is still there for anything this shortcut doesn't
+ * cover: swapping a player, correcting a winner, adding a score, or
  * marking a game done with no winner recorded at all ("No winner" below).
  */
 export function CourtBox({
@@ -50,11 +53,8 @@ export function CourtBox({
 
   const team1Names = [game.player1?.name, game.player2?.name];
   const team2Names = [game.player3?.name, game.player4?.name];
-  const armedNames = armedTeam === "team1" ? team1Names : armedTeam === "team2" ? team2Names : null;
 
-  function confirmWinner() {
-    if (!armedTeam) return;
-    const team = armedTeam;
+  function confirmWinner(team: "team1" | "team2") {
     startFinishTransition(async () => {
       await queueableFinishGameWithWinner(isOnline, game.id, team);
       setArmedTeam(null);
@@ -76,16 +76,18 @@ export function CourtBox({
           </button>
 
           {/* The court: two halves split by the net, 2 players a side, each
-           * half its own tap target for the winner shortcut below. Wider
-           * than it is tall — the net runs down the middle instead of
-           * across it — with room for a name to wrap to a second line
-           * rather than truncate. */}
+           * half its own tap target for the winner shortcut — and, once
+           * armed, its own Confirm/Cancel. Wider than it is tall — the net
+           * runs down the middle instead of across it — with room for a
+           * name to wrap to a second line rather than truncate. */}
           <div className="flex min-h-[140px] flex-1 flex-row bg-emerald-600">
             <TeamHalf
               names={team1Names}
               armed={armedTeam === "team1"}
               disabled={isBusy}
               onTap={() => setArmedTeam((prev) => (prev === "team1" ? null : "team1"))}
+              onConfirm={() => confirmWinner("team1")}
+              onCancel={() => setArmedTeam(null)}
               netSide
             />
             <TeamHalf
@@ -93,34 +95,15 @@ export function CourtBox({
               armed={armedTeam === "team2"}
               disabled={isBusy}
               onTap={() => setArmedTeam((prev) => (prev === "team2" ? null : "team2"))}
+              onConfirm={() => confirmWinner("team2")}
+              onCancel={() => setArmedTeam(null)}
             />
           </div>
 
-          {armedTeam && armedNames ? (
-            <div className="flex flex-none items-center justify-between gap-1.5 bg-amber-400 px-1.5 py-1.5">
-              <span className="min-w-0 truncate text-[11px] font-semibold text-amber-900">
-                {armedNames.filter(Boolean).join(" & ")} won?
-              </span>
-              <span className="flex flex-none items-center gap-1">
-                <button
-                  type="button"
-                  disabled={isBusy}
-                  onClick={confirmWinner}
-                  className="rounded bg-amber-900 px-2 py-1 text-[10px] font-bold text-white transition-colors hover:bg-amber-950 disabled:opacity-50"
-                >
-                  Confirm
-                </button>
-                <button
-                  type="button"
-                  disabled={isBusy}
-                  onClick={() => setArmedTeam(null)}
-                  className="rounded px-1.5 py-1 text-[10px] font-medium text-amber-900/70 transition-colors hover:bg-amber-300/60"
-                >
-                  Cancel
-                </button>
-              </span>
-            </div>
-          ) : (
+          {/* Hidden while a side's armed — its own Confirm/Cancel already
+           * covers "back out", so this footer would just be a second,
+           * redundant way out competing for a tap right next to it. */}
+          {!armedTeam && (
             <div className="flex flex-none items-center justify-between gap-1 bg-black/5 px-1.5 py-1">
               <p className="min-w-0 truncate text-[10px] text-black/40">Tap a side for the winner</p>
               <button
@@ -147,23 +130,55 @@ function TeamHalf({
   armed,
   disabled,
   onTap,
+  onConfirm,
+  onCancel,
   netSide = false,
 }: {
   names: (string | null | undefined)[];
   armed: boolean;
   disabled: boolean;
   onTap: () => void;
+  onConfirm: () => void;
+  onCancel: () => void;
   /** The left half draws the thick "net" divider on its own right edge. */
   netSide?: boolean;
 }) {
+  const netBorder = netSide ? "border-r-[3px] border-white/90" : "";
+
+  if (armed) {
+    const teamLabel = names.filter(Boolean).join(" & ") || "—";
+    return (
+      <div className={`flex flex-1 flex-col items-center justify-center gap-1.5 bg-amber-400 px-2 py-2 ${netBorder}`}>
+        <p className="text-center text-sm font-bold leading-tight text-amber-950">{teamLabel}</p>
+        <p className="text-[9px] font-semibold uppercase tracking-wide text-amber-900/70">Won?</p>
+        <div className="flex w-full flex-col gap-1">
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={onConfirm}
+            className="rounded-md bg-amber-950 py-1.5 text-[11px] font-bold text-white transition-colors hover:bg-black disabled:opacity-50"
+          >
+            Confirm
+          </button>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={onCancel}
+            className="rounded-md bg-white/70 py-1 text-[10px] font-medium text-amber-950 transition-colors hover:bg-white disabled:opacity-50"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <button
       type="button"
       disabled={disabled}
       onClick={onTap}
-      className={`grid flex-1 grid-rows-2 divide-y divide-white/40 transition-colors disabled:cursor-not-allowed ${
-        netSide ? "border-r-[3px] border-white/90" : ""
-      } ${armed ? "bg-black/20" : "hover:bg-white/10 active:bg-white/15"}`}
+      className={`grid flex-1 grid-rows-2 divide-y divide-white/40 transition-colors disabled:cursor-not-allowed hover:bg-white/10 active:bg-white/15 ${netBorder}`}
     >
       <PlayerCell name={names[0]} />
       <PlayerCell name={names[1]} />
