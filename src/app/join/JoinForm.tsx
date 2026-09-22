@@ -123,10 +123,10 @@ export function JoinForm({ initialCode = "" }: { initialCode?: string }) {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-black/[0.02] p-4">
-      <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-soft">
+      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-soft">
         <div className="mb-6 flex flex-col items-center gap-2">
-          <span className="flex h-12 w-12 items-center justify-center rounded-full btn-brand text-white">
-            <IconShuttle className="h-6 w-6" />
+          <span className="flex h-14 w-14 items-center justify-center rounded-full btn-brand text-white shadow-lg shadow-brand/30">
+            <IconShuttle className="h-7 w-7" />
           </span>
           <h1 className="text-lg font-semibold">View the queue</h1>
           <p className="text-center text-sm text-black/50">
@@ -136,7 +136,7 @@ export function JoinForm({ initialCode = "" }: { initialCode?: string }) {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-brand">Session code</label>
+            <label className="mb-1.5 block text-sm font-medium text-brand">Session code</label>
             <input
               type="text"
               inputMode="numeric"
@@ -146,7 +146,7 @@ export function JoinForm({ initialCode = "" }: { initialCode?: string }) {
               placeholder="6-digit code"
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-              className="w-full rounded border border-black/15 px-3 py-2 text-center text-lg tracking-[0.3em]"
+              className="w-full rounded-xl border border-black/15 px-3 py-3 text-center text-xl tracking-[0.3em] outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
             />
           </div>
 
@@ -155,7 +155,7 @@ export function JoinForm({ initialCode = "" }: { initialCode?: string }) {
           <button
             type="submit"
             disabled={isPending}
-            className="w-full rounded btn-brand px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            className="w-full rounded-xl btn-brand px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
           >
             {isPending ? "Loading…" : "View queue"}
           </button>
@@ -165,9 +165,27 @@ export function JoinForm({ initialCode = "" }: { initialCode?: string }) {
   );
 }
 
+/** A small pulsing dot — "this is live, it'll change on its own" — reused
+ * for the header's live indicator and the footer note. `dot`/`ping` are the
+ * two color classes (a solid dot plus the paler ring animating outward). */
+function LiveDot({ dot, ping }: { dot: string; ping: string }) {
+  return (
+    <span className="relative flex h-1.5 w-1.5 flex-none">
+      <span className={`absolute inline-flex h-full w-full animate-ping rounded-full ${ping}`} />
+      <span className={`relative inline-flex h-1.5 w-1.5 rounded-full ${dot}`} />
+    </span>
+  );
+}
+
 /** The live, read-only queue itself — "Now playing" (Ongoing games, each
- * shown as team vs. team) then "Up next" (Queued games, in order). Pure
- * viewing: no controls, nothing tappable except "Change code". */
+ * shown as a court card) then "Up next" (Queued games, numbered in order).
+ * Pure viewing: no controls, nothing tappable except "Change code". Built
+ * mobile-first — this is the page most players actually open, usually on
+ * their phone while standing courtside — with a branded gradient header
+ * (same gradient as the main app's, so a scanning player recognizes it as
+ * part of the same thing) rather than the plain utility-page look the code
+ * entry screen still uses.
+ */
 function QueueView({
   sessionDate,
   games,
@@ -181,16 +199,21 @@ function QueueView({
   const queued = games.filter((g) => g.status === "Queued");
 
   return (
-    <div className="min-h-screen bg-black/[0.02] p-4">
-      <div className="mx-auto w-full max-w-sm space-y-4">
-        <div className="flex items-center justify-between rounded-xl bg-white p-4 shadow-soft">
-          <div className="flex items-center gap-2">
-            <span className="flex h-9 w-9 flex-none items-center justify-center rounded-full btn-brand text-white">
-              <IconShuttle className="h-4 w-4" />
+    <div className="min-h-screen bg-black/[0.02] pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+      {/* Hero header, full-bleed — matches the main app's header gradient so
+       * this reads as the same product, not a bare fallback page. */}
+      <div className="bg-gradient-to-r from-brand to-accent px-4 pb-9 pt-[max(1.25rem,env(safe-area-inset-top))] text-white shadow-[0_2px_14px_rgba(236,72,153,0.3)]">
+        <div className="mx-auto flex w-full max-w-sm items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-white/15">
+              <IconShuttle className="h-5 w-5" />
             </span>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-black/40">Live queue</p>
-              <p className="text-sm font-medium">
+            <div className="min-w-0">
+              <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-white/75">
+                <LiveDot dot="bg-white" ping="bg-white/70" />
+                Live queue
+              </p>
+              <p className="truncate text-base font-semibold">
                 {sessionDate
                   ? new Date(sessionDate).toLocaleDateString("en-US", {
                       weekday: "long",
@@ -201,20 +224,39 @@ function QueueView({
               </p>
             </div>
           </div>
-          <button type="button" onClick={onChangeCode} className="text-xs font-medium text-brand hover:underline">
+          <button
+            type="button"
+            onClick={onChangeCode}
+            className="flex-none rounded-full bg-white/15 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-white/25"
+          >
             Change code
           </button>
         </div>
+      </div>
 
-        <section className="rounded-xl bg-white p-4 shadow-soft">
-          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-black/40">Now playing</h2>
+      {/* Cards overlap the header slightly (negative margin) — a common
+       * mobile-hero pattern that makes the page feel like one composed
+       * screen instead of a colored banner stacked on plain white. */}
+      <div className="mx-auto -mt-5 w-full max-w-sm space-y-3 px-4">
+        <section className="rounded-2xl bg-white p-4 shadow-soft">
+          <h2 className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-black/40">
+            <span className="h-2 w-2 flex-none rounded-full bg-rose-500" />
+            Now playing
+          </h2>
           {ongoing.length === 0 ? (
-            <p className="py-4 text-center text-sm text-black/40">No games on court right now.</p>
+            <EmptyRow text="No games on court right now." />
           ) : (
             <ul className="space-y-2">
               {ongoing.map((g) => (
-                <li key={g.gameNumber} className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm">
-                  <span className="mr-2 flex-none font-medium text-black/40">G{g.gameNumber}</span>
+                <li key={g.gameNumber} className="rounded-xl border border-rose-100 bg-rose-50/70 px-3.5 py-3">
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-rose-500/80">
+                      Game {g.gameNumber}
+                    </span>
+                    <span className="rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                      On court
+                    </span>
+                  </div>
                   <Matchup players={g.players} />
                 </li>
               ))}
@@ -222,34 +264,60 @@ function QueueView({
           )}
         </section>
 
-        <section className="rounded-xl bg-white p-4 shadow-soft">
+        <section className="rounded-2xl bg-white p-4 shadow-soft">
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-black/40">Up next</h2>
           {queued.length === 0 ? (
-            <p className="py-4 text-center text-sm text-black/40">Queue&apos;s empty right now.</p>
+            <EmptyRow text="Queue's empty right now." />
           ) : (
             <ol className="space-y-2">
-              {queued.map((g) => (
-                <li key={g.gameNumber} className="rounded-lg bg-black/[0.03] px-3 py-2 text-sm">
-                  <span className="mr-2 flex-none font-medium text-black/40">G{g.gameNumber}</span>
-                  <Matchup players={g.players} />
+              {queued.map((g, i) => (
+                <li key={g.gameNumber} className="flex items-center gap-3 rounded-xl bg-black/[0.03] px-3.5 py-3">
+                  <span className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-white text-[11px] font-bold text-black/40 shadow-sm">
+                    {i + 1}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="mb-0.5 text-[10px] font-medium uppercase tracking-wide text-black/30">
+                      Game {g.gameNumber}
+                    </p>
+                    <Matchup players={g.players} />
+                  </div>
                 </li>
               ))}
             </ol>
           )}
         </section>
+
+        <p className="flex items-center justify-center gap-1.5 pb-1 pt-2 text-[11px] text-black/30">
+          <LiveDot dot="bg-emerald-500" ping="bg-emerald-400/70" />
+          Updates automatically
+        </p>
       </div>
     </div>
   );
 }
 
+function EmptyRow({ text }: { text: string }) {
+  return (
+    <div className="flex h-16 items-center justify-center rounded-xl border border-dashed border-black/10 text-center text-sm text-black/40">
+      {text}
+    </div>
+  );
+}
+
 /** "Ced & Weng  vs  Tey & Ron" — a blank slot (game logged with fewer than
- * 4 players) just drops out of its side rather than showing a placeholder. */
+ * 4 players) just drops out of its side rather than showing a placeholder.
+ * Both sides get equal room and truncate independently so one long name
+ * doesn't push the "vs" badge off a narrow phone screen. */
 function Matchup({ players }: { players: [string | null, string | null, string | null, string | null] }) {
   const team1 = players.slice(0, 2).filter(Boolean).join(" & ") || "—";
   const team2 = players.slice(2, 4).filter(Boolean).join(" & ") || "—";
   return (
-    <span className="font-medium">
-      {team1} <span className="font-normal text-black/40">vs</span> {team2}
-    </span>
+    <div className="flex items-center gap-2">
+      <span className="min-w-0 flex-1 truncate text-sm font-semibold text-black/80">{team1}</span>
+      <span className="flex-none rounded-full bg-black/5 px-1.5 py-0.5 text-[9px] font-bold uppercase text-black/40">
+        vs
+      </span>
+      <span className="min-w-0 flex-1 truncate text-right text-sm font-semibold text-black/80">{team2}</span>
+    </div>
   );
 }
