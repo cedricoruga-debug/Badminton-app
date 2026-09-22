@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { IconShuttle } from "@/app/components/icons";
+import { LiveDot } from "@/app/components/LiveDot";
 import { Matchup } from "@/app/components/Matchup";
 
 type QueueGame = {
@@ -163,18 +164,6 @@ export function JoinForm({ initialCode = "" }: { initialCode?: string }) {
         </form>
       </div>
     </div>
-  );
-}
-
-/** A small pulsing dot — "this is live, it'll change on its own" — reused
- * for the header's live indicator and the footer note. `dot`/`ping` are the
- * two color classes (a solid dot plus the paler ring animating outward). */
-function LiveDot({ dot, ping }: { dot: string; ping: string }) {
-  return (
-    <span className="relative flex h-1.5 w-1.5 flex-none">
-      <span className={`absolute inline-flex h-full w-full animate-ping rounded-full ${ping}`} />
-      <span className={`relative inline-flex h-1.5 w-1.5 rounded-full ${dot}`} />
-    </span>
   );
 }
 

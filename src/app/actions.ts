@@ -133,6 +133,32 @@ export async function advanceGameStatus(gameId: string, currentStatus: string) {
   revalidatePath("/player-sessions");
 }
 
+/**
+ * Finish an Ongoing game and record its winner in one step — the shortcut
+ * behind CourtBox's two clickable court halves (tap a side, then Confirm).
+ * Jumps straight to "Done" with the tapped team as winner instead of making
+ * you open Edit Game and set status + winner separately. Score isn't part
+ * of this shortcut (usually not known/needed tap-side) — add one later via
+ * Edit Game if you want it on record.
+ */
+export async function finishGameWithWinner(gameId: string, winnerTeam: "team1" | "team2") {
+  const supabase = await createClient();
+
+  const { data: game, error } = await supabase
+    .from("games")
+    .update({ status: "Done", winner_team: winnerTeam })
+    .eq("id", gameId)
+    .select("session_id")
+    .single();
+  if (error) throw new Error(error.message);
+
+  await recomputePlayerGameCounts(supabase, game.session_id);
+  revalidatePath("/");
+  revalidatePath("/games");
+  revalidatePath("/sessions");
+  revalidatePath("/player-sessions");
+}
+
 const PAYMENT_CYCLE: Array<"Unpaid" | "Cash" | "Gcash"> = ["Unpaid", "Gcash", "Cash"];
 
 /** Cycle a player's payment method for a session: Unpaid -> GCash -> Cash -> Unpaid. */

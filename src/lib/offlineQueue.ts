@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { advanceGameStatus, markPaid } from "@/app/actions";
+import { advanceGameStatus, finishGameWithWinner, markPaid } from "@/app/actions";
 
 /**
  * Offline resilience — first pass (see the "Offline resilience" item in the
@@ -25,7 +25,14 @@ import { advanceGameStatus, markPaid } from "@/app/actions";
 
 type QueuedAction =
   | { id: string; kind: "advanceGameStatus"; label: string; queuedAt: number; args: [gameId: string, currentStatus: string] }
-  | { id: string; kind: "markPaid"; label: string; queuedAt: number; args: [playerSessionId: string, method: "Cash" | "Gcash"] };
+  | { id: string; kind: "markPaid"; label: string; queuedAt: number; args: [playerSessionId: string, method: "Cash" | "Gcash"] }
+  | {
+      id: string;
+      kind: "finishGameWithWinner";
+      label: string;
+      queuedAt: number;
+      args: [gameId: string, winnerTeam: "team1" | "team2"];
+    };
 
 const STORAGE_KEY = "badminton-offline-queue-v1";
 
@@ -163,6 +170,8 @@ function runQueuedAction(action: QueuedAction) {
       return advanceGameStatus(...action.args);
     case "markPaid":
       return markPaid(...action.args);
+    case "finishGameWithWinner":
+      return finishGameWithWinner(...action.args);
   }
 }
 
@@ -199,6 +208,26 @@ export function queueableMarkPaid(isOnline: boolean, playerSessionId: string, me
     label: "Payment",
     queuedAt: Date.now(),
     args: [playerSessionId, method],
+  });
+  return Promise.resolve();
+}
+
+/** Drop-in replacement for calling `finishGameWithWinner` directly — see
+ * queueableAdvanceGameStatus above. Backs CourtBox's tap-a-side-to-win
+ * shortcut, so it needs the same offline safety net as the rest of a game's
+ * status changes. */
+export function queueableFinishGameWithWinner(
+  isOnline: boolean,
+  gameId: string,
+  winnerTeam: "team1" | "team2"
+) {
+  if (isOnline) return finishGameWithWinner(gameId, winnerTeam);
+  enqueue({
+    id: crypto.randomUUID(),
+    kind: "finishGameWithWinner",
+    label: "Game result",
+    queuedAt: Date.now(),
+    args: [gameId, winnerTeam],
   });
   return Promise.resolve();
 }

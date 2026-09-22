@@ -12,6 +12,7 @@ import {
 import { PlayerSessionRow } from "@/app/components/PlayerSessionRow";
 import { GameRow } from "@/app/components/GameRow";
 import { CourtBox } from "@/app/components/CourtBox";
+import { LiveDot } from "@/app/components/LiveDot";
 import { JoinQrSection } from "@/app/components/JoinQrSection";
 import { PaymentQrSection } from "@/app/components/PaymentQrSection";
 import { NewGameButton } from "@/app/components/NewGameButton";
@@ -132,6 +133,30 @@ export default async function Home() {
         </div>
       </div>
 
+      {/* On court — every Ongoing game, drawn as a court card, in its own
+       * full-width band above the three-column layout rather than eating
+       * space inside "Games Queued" below. There's realistically only ever
+       * a handful of courts going at once, so a dedicated strip reads
+       * better than squeezing them above a scrolling list — and "who's
+       * still out there" is the thing you actually glance at mid-session,
+       * so it earns the top of the page. Capped and internally scrollable
+       * in landscape only (portrait just scrolls the whole page). */}
+      {ongoingGames.length > 0 && (
+        <div className="flex-none px-4 pt-4">
+          <section className="rounded-xl bg-white p-4 shadow-soft">
+            <h3 className="mb-3 flex items-center gap-2 font-semibold">
+              <LiveDot dot="bg-rose-500" ping="bg-rose-400/70" />
+              On court
+            </h3>
+            <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 landscape:max-h-[38vh] landscape:grid-cols-3 landscape:overflow-y-auto">
+              {ongoingGames.map((g) => (
+                <CourtBox key={g.id} game={g} sessions={sessions} players={sessionPlayers} games={allSessionGames} />
+              ))}
+            </div>
+          </section>
+        </div>
+      )}
+
       <main className="flex flex-1 flex-col gap-4 px-4 pb-4 pt-4 landscape:grid landscape:min-h-0 landscape:grid-cols-[0.5fr_1.8fr_0.8fr]">
         {/* Games Queued — what's left to play this session. Stays first in
          * the markup (so portrait/mobile shows it on top, per an earlier
@@ -145,20 +170,6 @@ export default async function Home() {
             <IconRacket className="h-4 w-4 text-brand" />
             Games Queued
           </h3>
-
-          {ongoingGames.length > 0 && (
-            <div className="mb-3 grid flex-none grid-cols-1 gap-2 min-[420px]:grid-cols-2">
-              {ongoingGames.map((g) => (
-                <CourtBox
-                  key={g.id}
-                  game={g}
-                  sessions={sessions}
-                  players={sessionPlayers}
-                  games={allSessionGames}
-                />
-              ))}
-            </div>
-          )}
 
           <ul className="max-h-96 overflow-x-hidden overflow-y-auto landscape:min-h-0 landscape:max-h-none landscape:flex-1">
             {!session ? (
