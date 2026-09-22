@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import {
   getAllSessions,
@@ -47,6 +48,17 @@ export default async function Home() {
   // each group.
   const ongoingGames = queuedGames.filter((g) => g.status === "Ongoing");
   const notStartedGames = queuedGames.filter((g) => g.status !== "Ongoing");
+
+  // How many courts fit in one row before the strip below starts scrolling
+  // sideways instead of shrinking further or wrapping to a second row. 1-2
+  // courts keep the same size they'd have side by side (no visible change);
+  // 3 or 4 shrink together so all of them still fit in one row; 5+ hold that
+  // same "4 courts wide" size and just scroll — never smaller, never a
+  // second row eating vertical space. Computed here (not in CSS) because
+  // it depends on how many courts there actually are, which only this
+  // server component knows before the browser does.
+  const courtColumns = Math.min(4, Math.max(2, ongoingGames.length));
+  const courtWidth = `calc((100% - ${(courtColumns - 1) * 0.75}rem) / ${courtColumns})`;
 
   // A few extra numbers for the Details panel below the QR code — all
   // derived from sessionPlayers/allSessionGames, already fetched above, no
@@ -135,12 +147,14 @@ export default async function Home() {
 
       {/* On court — every Ongoing game, drawn as a court card, in its own
        * full-width band above the three-column layout rather than eating
-       * space inside "Games Queued" below. There's realistically only ever
-       * a handful of courts going at once, so a dedicated strip reads
-       * better than squeezing them above a scrolling list — and "who's
-       * still out there" is the thing you actually glance at mid-session,
-       * so it earns the top of the page. Capped and internally scrollable
-       * in landscape only (portrait just scrolls the whole page). */}
+       * space inside "Games Queued" below. Always a single row: 1-2 courts
+       * just sit at their natural size, 3-4 shrink together to still fit
+       * that one row, and a 5th+ court doesn't shrink the rest any further
+       * or wrap to a second row — the strip scrolls sideways instead, so
+       * this band's height never grows with how many courts are live. Below
+       * 420px it falls back to stacking full-width (one court per line) —
+       * shrinking 2-4 across on a narrow phone would leave them too
+       * cramped to read. */}
       {ongoingGames.length > 0 && (
         <div className="flex-none px-4 pt-4">
           <section className="rounded-xl bg-white p-4 shadow-soft">
@@ -148,9 +162,14 @@ export default async function Home() {
               <LiveDot dot="bg-rose-500" ping="bg-rose-400/70" />
               On court
             </h3>
-            <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 landscape:max-h-[38vh] landscape:grid-cols-3 landscape:overflow-y-auto">
+            <div
+              className="flex flex-col gap-3 min-[420px]:flex-row min-[420px]:overflow-x-auto min-[420px]:pb-1"
+              style={{ "--court-w": courtWidth } as CSSProperties}
+            >
               {ongoingGames.map((g) => (
-                <CourtBox key={g.id} game={g} sessions={sessions} players={sessionPlayers} games={allSessionGames} />
+                <div key={g.id} className="min-[420px]:w-[var(--court-w)] min-[420px]:flex-none">
+                  <CourtBox game={g} sessions={sessions} players={sessionPlayers} games={allSessionGames} />
+                </div>
               ))}
             </div>
           </section>
