@@ -7,6 +7,13 @@
  * a matchup reads the same way wherever it shows up. A single missing slot
  * just drops out of its side (e.g. only one of two picked so far); a side
  * with nothing at all falls back to "—".
+ *
+ * Flows as one line of text that wraps naturally rather than splitting into
+ * two fixed-width, independently truncated halves — an even 50/50 split
+ * clips a long name on one side even when the other side has room to spare
+ * (e.g. "Nikki & Achi" next to "Liam & We…"), which loses information a
+ * queue master actually needs. Wrapping to a second line costs a bit of
+ * row height but never hides a name.
  */
 export function Matchup({
   team1,
@@ -22,12 +29,12 @@ export function Matchup({
   const textSize = size === "sm" ? "text-xs" : "text-sm";
 
   return (
-    <div className="flex items-center gap-2">
-      <span className={`min-w-0 flex-1 truncate font-semibold text-black/80 ${textSize}`}>{left}</span>
-      <span className="flex-none rounded-full bg-black/5 px-1.5 py-0.5 text-[9px] font-bold uppercase text-black/40">
+    <p className={`font-semibold leading-snug text-black/80 ${textSize}`}>
+      {left}
+      <span className="mx-1.5 inline-block rounded-full bg-black/5 px-1.5 py-0.5 align-[0.1em] text-[9px] font-bold uppercase text-black/40">
         vs
       </span>
-      <span className={`min-w-0 flex-1 truncate text-right font-semibold text-black/80 ${textSize}`}>{right}</span>
-    </div>
+      {right}
+    </p>
   );
 }
