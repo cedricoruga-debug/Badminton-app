@@ -137,6 +137,7 @@ export function GameFormFields({
   sessionId,
   sessions,
   defaultSessionId,
+  showSessionPicker = true,
   players,
   games = [],
   defaultStatus = "Queued",
@@ -156,6 +157,13 @@ export function GameFormFields({
   sessionId?: string;
   sessions: SessionOption[];
   defaultSessionId: string;
+  /** Whether to show the "Session date" dropdown at all — the dashboard's
+   * New Game shortcut always logs into the current session, so the picker
+   * is just clutter there; the Games page's Add Game flow is the one place
+   * you're deliberately choosing a date, so it keeps it. When hidden,
+   * `defaultSessionId` is still submitted via a hidden field. Defaults to
+   * true so Edit Game (which doesn't pass this) is unaffected. */
+  showSessionPicker?: boolean;
   players: PlayerSessionWithPlayer[];
   /** Every other game in this session (any status) — used only to color the
    * player picker below by who's free, already queued elsewhere, or
@@ -163,7 +171,10 @@ export function GameFormFields({
    * shows as free. */
   games?: GameForStatus[];
   defaultStatus?: "Queued" | "Ongoing" | "Done";
-  defaultPlayerIds?: string[];
+  /** Four raw slots (player1..player4), null where empty — not compacted.
+   * Slot position is what decides teams (0&1 = team1, 2&3 = team2), so a
+   * gap has to stay a gap rather than sliding the next pick up into it. */
+  defaultPlayerIds?: (string | null)[];
   /** 'team1' = player1+player2, 'team2' = player3+player4 — only shown/used
    * once status is Done. */
   defaultWinnerTeam?: "team1" | "team2" | null;
@@ -175,7 +186,16 @@ export function GameFormFields({
   redirectTo?: string;
   close: () => void;
 }) {
-  const [selected, setSelected] = useState<string[]>(defaultPlayerIds);
+  // Four fixed slots, not a compacting list — slot index is what decides
+  // teams (0&1 = team1, 2&3 = team2), so deselecting player #2 leaves slot 1
+  // empty instead of sliding player #3 up into it and quietly repartnering
+  // them with player #1. `toggle` below fills the first empty slot it finds
+  // on select, and just nulls a slot out on deselect.
+  const [selected, setSelected] = useState<(string | null)[]>(() => {
+    const padded = [...defaultPlayerIds];
+    while (padded.length < 4) padded.push(null);
+    return padded.slice(0, 4);
+  });
   const [status, setStatus] = useState(defaultStatus);
   const [winnerTeam, setWinnerTeam] = useState(defaultWinnerTeam);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -240,11 +260,28 @@ export function GameFormFields({
 
   function toggle(playerId: string) {
     setSelected((prev) => {
-      if (prev.includes(playerId)) return prev.filter((id) => id !== playerId);
-      if (prev.length >= 4) return prev;
-      return [...prev, playerId];
+      const idx = prev.indexOf(playerId);
+      if (idx !== -1) {
+        // Deselect: null out just this slot — everyone else stays put.
+        const next = [...prev];
+        next[idx] = null;
+        return next;
+      }
+      // Select: fill the first empty slot, not always the end — so
+      // reselecting after a mid-list deselect refills that same gap
+      // instead of bumping onto slot 4.
+      const emptyIdx = prev.indexOf(null);
+      if (emptyIdx === -1) return prev; // all 4 slots already filled
+      const next = [...prev];
+      next[emptyIdx] = playerId;
+      return next;
     });
   }
+
+  const filledCount = selected.filter(Boolean).length;
+  /** Slot 0/1 -> a name for the Matchup preview; null slot -> undefined
+   * (Matchup already treats a missing name as "not decided yet"). */
+  const slotName = (id: string | null) => (id ? nameById.get(id) : undefined);
 
   function handleDelete() {
     if (!gameId || !sessionId) return;
@@ -260,25 +297,29 @@ export function GameFormFields({
       {gameId && <input type="hidden" name="game_id" value={gameId} />}
       {redirectTo && <input type="hidden" name="redirect_to" value={redirectTo} />}
 
-      <div>
-        <label className="mb-1 block text-sm font-medium text-brand">Session date</label>
-        <select
-          name="session_id"
-          defaultValue={defaultSessionId}
-          required
-          className="w-full rounded border border-black/15 px-3 py-2 text-sm"
-        >
-          {sessions.map((s) => (
-            <option key={s.id} value={s.id}>
-              {new Date(s.session_date).toLocaleDateString("en-US")}
-            </option>
-          ))}
-        </select>
-      </div>
+      {showSessionPicker ? (
+        <div>
+          <label className="mb-1 block text-sm font-medium text-brand">Session date</label>
+          <select
+            name="session_id"
+            defaultValue={defaultSessionId}
+            required
+            className="w-full rounded border border-black/15 px-3 py-2 text-sm"
+          >
+            {sessions.map((s) => (
+              <option key={s.id} value={s.id}>
+                {new Date(s.session_date).toLocaleDateString("en-US")}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : (
+        <input type="hidden" name="session_id" value={defaultSessionId} />
+      )}
 
       <fieldset>
         <legend className="mb-2 block text-sm font-medium">Status</legend>
-        <div className="flex gap-2">
+        <div className="flex gap-1 rounded-xl bg-black/[0.04] p-1">
           {STATUSES.map(({ value, label }) => (
             <label key={value} className="flex-1">
               <input
@@ -289,7 +330,7 @@ export function GameFormFields({
                 onChange={() => setStatus(value)}
                 className="peer sr-only"
               />
-              <span className="block cursor-pointer rounded bg-black/5 px-4 py-2 text-center text-sm font-medium text-black/60 peer-checked:bg-brand peer-checked:text-white">
+              <span className="block cursor-pointer rounded-lg px-4 py-2 text-center text-sm font-medium text-black/50 transition-colors peer-checked:bg-white peer-checked:text-brand peer-checked:shadow-sm">
                 {label}
               </span>
             </label>
@@ -356,16 +397,22 @@ export function GameFormFields({
             <button
               type="button"
               title="Auto-pick 4 players — weighted by fewest games already queued, then who's waited longest"
-              onClick={() => setSelected(suggestNextMatch(players, games, gameId))}
+              onClick={() => {
+                const picked = suggestNextMatch(players, games, gameId);
+                const padded: (string | null)[] = [...picked];
+                while (padded.length < 4) padded.push(null);
+                setSelected(padded.slice(0, 4));
+              }}
               className="rounded-full border border-brand/30 px-2 py-0.5 text-[11px] font-medium text-brand transition-colors hover:bg-brand-light"
             >
               ✨ Suggest
             </button>
-            <span className="font-normal text-black/40">{selected.length}/4</span>
+            <span className="font-normal text-black/40">{filledCount}/4</span>
           </span>
         </legend>
         <p className="mb-2 text-xs text-black/40">
-          Tap order sets the teams — your 1st &amp; 2nd picks play together, then your 3rd &amp; 4th.
+          Pick order sets the teams — 1st &amp; 2nd play together, then 3rd &amp; 4th. Swapping one player out
+          leaves the others&apos; spots (and partners) alone.
         </p>
         {players.length === 0 ? (
           <p className="text-sm text-black/40">No players registered for this session yet.</p>
@@ -373,7 +420,7 @@ export function GameFormFields({
           <div className="flex flex-wrap gap-2">
             {players.map((ps) => {
               const checked = selected.includes(ps.player.id);
-              const disabled = !checked && selected.length >= 4;
+              const disabled = !checked && filledCount >= 4;
               const status = playerStatus.get(ps.player.id);
               const statusClasses =
                 status === "ongoing"
@@ -381,7 +428,7 @@ export function GameFormFields({
                   : status === "queued"
                     ? PICKER_STATUS_STYLES.queued
                     : PICKER_STATUS_STYLES.free;
-              // Which pick number this player is, if selected (1-4) — shown
+              // Which slot this player occupies, if selected (1-4) — shown
               // as a small badge so it's obvious at a glance which team a
               // tap just landed someone on, not just that they're picked.
               const pickNumber = selected.indexOf(ps.player.id) + 1;
@@ -389,10 +436,10 @@ export function GameFormFields({
                 <label key={ps.player.id}>
                   {/* No `name` here on purpose — this checkbox only drives
                    * the visual toggle. The actual player_id values that get
-                   * submitted come from the hidden inputs below, in
-                   * `selected`'s (i.e. tap) order — a native multi-checkbox
-                   * submits in DOM/roster order instead, which would silently
-                   * scramble who's paired with whom. */}
+                   * submitted come from the hidden inputs below, one per
+                   * fixed slot — a native multi-checkbox submits in
+                   * DOM/roster order instead, which would silently scramble
+                   * who's paired with whom. */}
                   <input
                     type="checkbox"
                     checked={checked}
@@ -401,11 +448,11 @@ export function GameFormFields({
                     className="peer sr-only"
                   />
                   <span
-                    className={`flex items-center gap-1 rounded border px-3 py-1.5 text-sm transition-colors ${
+                    className={`flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-sm font-medium transition-all ${
                       checked
-                        ? "cursor-pointer border-brand bg-brand text-white"
+                        ? "cursor-pointer border-transparent bg-brand text-white shadow-sm shadow-brand/30"
                         : disabled
-                          ? `cursor-not-allowed opacity-50 ${statusClasses}`
+                          ? `cursor-not-allowed opacity-40 ${statusClasses}`
                           : `cursor-pointer ${statusClasses}`
                     }`}
                   >
@@ -415,16 +462,22 @@ export function GameFormFields({
                       </span>
                     )}
                     {ps.player.name}
-                    <span className="text-[10px] opacity-70">({ps.total_games})</span>
+                    <span className={`text-[10px] ${checked ? "opacity-70" : "opacity-60"}`}>
+                      ({ps.total_games})
+                    </span>
                   </span>
                 </label>
               );
             })}
           </div>
         )}
-        {selected.map((id) => (
-          <input key={id} type="hidden" name="player_id" value={id} />
-        ))}
+        {/* One named hidden field per slot (not a repeated player_id list)
+         * so an empty slot round-trips as a real gap instead of getting
+         * compacted away — see the toggle()/actions.ts comments above. */}
+        <input type="hidden" name="player1_id" value={selected[0] ?? ""} />
+        <input type="hidden" name="player2_id" value={selected[1] ?? ""} />
+        <input type="hidden" name="player3_id" value={selected[2] ?? ""} />
+        <input type="hidden" name="player4_id" value={selected[3] ?? ""} />
         {games.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-black/40">
             <Legend swatch="bg-emerald-100 border-emerald-300" label="Not queued" />
@@ -432,12 +485,12 @@ export function GameFormFields({
             <Legend swatch="bg-red-100 border-red-300" label="Playing now" />
           </div>
         )}
-        {selected.length > 0 && (
+        {filledCount > 0 && (
           <div className="mt-3 rounded-lg bg-black/[0.03] px-3 py-2.5">
             <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-black/40">Matchup</p>
             <Matchup
-              team1={[nameById.get(selected[0]), nameById.get(selected[1])]}
-              team2={[nameById.get(selected[2]), nameById.get(selected[3])]}
+              team1={[slotName(selected[0]), slotName(selected[1])]}
+              team2={[slotName(selected[2]), slotName(selected[3])]}
             />
           </div>
         )}
@@ -502,7 +555,7 @@ export function GameFormFields({
        * it doesn't fit) rather than stacked, positioned just under the
        * modal's own dialog box (see panelTop above) so it sits close to
        * the form instead of pinned to the bottom of the screen. */}
-      {selected.length > 0 &&
+      {filledCount > 0 &&
         createPortal(
           <div
             className={`pointer-events-none fixed inset-x-0 z-[60] flex flex-row flex-wrap items-start justify-center gap-2 px-4 ${
@@ -510,21 +563,23 @@ export function GameFormFields({
             }`}
             style={panelTop !== null ? { top: panelTop } : undefined}
           >
-            {selected.map((playerId) => {
-              const ps = players.find((p) => p.player.id === playerId);
-              if (!ps) return null;
-              return (
-                <div key={playerId} className="pointer-events-auto">
-                  <PlayerHistoryPanel
-                    playerId={playerId}
-                    playerName={ps.player.name}
-                    games={games}
-                    nameById={nameById}
-                    maxHeight={panelMaxHeight ?? undefined}
-                  />
-                </div>
-              );
-            })}
+            {selected
+              .filter((id): id is string => Boolean(id))
+              .map((playerId) => {
+                const ps = players.find((p) => p.player.id === playerId);
+                if (!ps) return null;
+                return (
+                  <div key={playerId} className="pointer-events-auto">
+                    <PlayerHistoryPanel
+                      playerId={playerId}
+                      playerName={ps.player.name}
+                      games={games}
+                      nameById={nameById}
+                      maxHeight={panelMaxHeight ?? undefined}
+                    />
+                  </div>
+                );
+              })}
           </div>,
           document.body
         )}

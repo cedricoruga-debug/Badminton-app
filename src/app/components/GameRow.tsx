@@ -54,26 +54,25 @@ export function GameRow({
             className="-mx-2 flex cursor-pointer items-center justify-between gap-3 rounded-lg px-2 py-3 transition-colors hover:bg-black/[0.03]"
           >
             <div className="min-w-0">
+              <p className="mb-0.5 text-[10px] font-medium uppercase tracking-wide text-black/30">
+                Game {game.game_number}
+              </p>
               <Matchup
                 team1={[game.player1?.name, game.player2?.name]}
                 team2={[game.player3?.name, game.player4?.name]}
               />
-              <p className="text-xs text-black/40">
-                Game {game.game_number}
-                {game.winner_team && (
-                  <>
-                    {" · "}
-                    <span className="font-medium text-emerald-700">
-                      {game.winner_team === "team1"
-                        ? `${game.player1?.name ?? "Team 1"} / ${game.player2?.name ?? ""}`
-                        : `${game.player3?.name ?? "Team 2"} / ${game.player4?.name ?? ""}`}{" "}
-                      won
-                    </span>
-                    {(game.score1 !== null || game.score2 !== null) &&
-                      ` (${game.score1 ?? "–"}-${game.score2 ?? "–"})`}
-                  </>
-                )}
-              </p>
+              {game.winner_team && (
+                <p className="mt-0.5 text-xs text-black/40">
+                  <span className="font-medium text-emerald-700">
+                    {game.winner_team === "team1"
+                      ? `${game.player1?.name ?? "Team 1"} / ${game.player2?.name ?? ""}`
+                      : `${game.player3?.name ?? "Team 2"} / ${game.player4?.name ?? ""}`}{" "}
+                    won
+                  </span>
+                  {(game.score1 !== null || game.score2 !== null) &&
+                    ` (${game.score1 ?? "–"}-${game.score2 ?? "–"})`}
+                </p>
+              )}
             </div>
 
             <div className="flex flex-none items-center gap-2">

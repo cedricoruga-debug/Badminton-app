@@ -34,6 +34,11 @@ export function NewGameButton({
   variant?: "grid" | "icon";
 }) {
   const title = nextGameNumber !== undefined ? `New Game #${nextGameNumber}` : "New Game";
+  // The dashboard's "New Game" shortcut always logs into the latest/current
+  // session, so picking a date there is just clutter — the Games page's Add
+  // Game (variant="icon") is the one place you're deliberately working a
+  // specific past date, so that's the one that keeps the picker.
+  const showSessionPicker = variant === "icon";
 
   return (
     <Modal
@@ -62,6 +67,7 @@ export function NewGameButton({
           action={createGame}
           sessions={sessions}
           defaultSessionId={sessionId}
+          showSessionPicker={showSessionPicker}
           players={players}
           games={games}
           close={close}

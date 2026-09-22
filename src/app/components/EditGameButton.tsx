@@ -30,9 +30,17 @@ export function EditGameButton({
   games?: GameForStatus[];
   children: (open: () => void) => ReactNode;
 }) {
-  const defaultPlayerIds = [game.player1_id, game.player2_id, game.player3_id, game.player4_id].filter(
-    (id): id is string => Boolean(id)
-  );
+  // Kept as four raw slots (nulls included), not compacted — a game that
+  // already has a gap (player2 missing, say) should reopen with that same
+  // gap in place rather than sliding player3 up into player2's spot, which
+  // would silently swap who's partnered with whom. See GameFormFields'
+  // `selected` state.
+  const defaultPlayerIds: (string | null)[] = [
+    game.player1_id,
+    game.player2_id,
+    game.player3_id,
+    game.player4_id,
+  ];
 
   return (
     <Modal label="Edit Game" icon={null} title={`Edit Game #${game.game_number}`} trigger={children}>

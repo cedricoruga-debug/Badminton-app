@@ -651,6 +651,22 @@ function parseScore(value: FormDataEntryValue | null): number | null {
 }
 
 /**
+ * Reads one of the four player-slot fields (player1_id..player4_id). The
+ * form submits these as four independently-named hidden inputs rather than
+ * a single repeated `player_id` list, so that an empty slot (a player
+ * deselected mid-pick, leaving a gap) survives the round trip as a real gap
+ * instead of getting silently compacted out — a repeated-list-plus-filter
+ * approach would shift everyone after the gap down by one and reassign
+ * partnerships that the queue master didn't ask to change. See
+ * GameFormFields' `selected` state for the client-side half of this.
+ */
+function parsePlayerSlot(formData: FormData, field: string): string | null {
+  const value = formData.get(field);
+  const s = value ? String(value) : "";
+  return s || null;
+}
+
+/**
  * Log a new game (the "New Game" shortcut, on the dashboard or the Games
  * page). The "date" field is really a session picker — its options are
  * existing session dates, so the game always inherits its game_date from
@@ -660,7 +676,10 @@ function parseScore(value: FormDataEntryValue | null): number | null {
 export async function createGame(formData: FormData) {
   const sessionId = String(formData.get("session_id") ?? "");
   const status = parseGameStatus(formData.get("status"));
-  const playerIds = formData.getAll("player_id").map(String).filter(Boolean).slice(0, 4);
+  const player1Id = parsePlayerSlot(formData, "player1_id");
+  const player2Id = parsePlayerSlot(formData, "player2_id");
+  const player3Id = parsePlayerSlot(formData, "player3_id");
+  const player4Id = parsePlayerSlot(formData, "player4_id");
   const winnerTeam = parseWinnerTeam(formData.get("winner_team"));
   const score1 = parseScore(formData.get("score1"));
   const score2 = parseScore(formData.get("score2"));
@@ -680,10 +699,10 @@ export async function createGame(formData: FormData) {
     game_number: (count ?? 0) + 1,
     game_date: session.session_date,
     status,
-    player1_id: playerIds[0] ?? null,
-    player2_id: playerIds[1] ?? null,
-    player3_id: playerIds[2] ?? null,
-    player4_id: playerIds[3] ?? null,
+    player1_id: player1Id,
+    player2_id: player2Id,
+    player3_id: player3Id,
+    player4_id: player4Id,
     // Only meaningful once the game is Done — a Queued/Ongoing game just
     // stores nulls here, same as never having set them.
     winner_team: status === "Done" ? winnerTeam : null,
@@ -750,7 +769,10 @@ export async function updateGame(formData: FormData) {
   const gameId = String(formData.get("game_id") ?? "");
   const sessionId = String(formData.get("session_id") ?? "");
   const status = parseGameStatus(formData.get("status"));
-  const playerIds = formData.getAll("player_id").map(String).filter(Boolean).slice(0, 4);
+  const player1Id = parsePlayerSlot(formData, "player1_id");
+  const player2Id = parsePlayerSlot(formData, "player2_id");
+  const player3Id = parsePlayerSlot(formData, "player3_id");
+  const player4Id = parsePlayerSlot(formData, "player4_id");
   const winnerTeam = parseWinnerTeam(formData.get("winner_team"));
   const score1 = parseScore(formData.get("score1"));
   const score2 = parseScore(formData.get("score2"));
@@ -781,10 +803,10 @@ export async function updateGame(formData: FormData) {
       session_id: sessionId,
       game_date: session.session_date,
       status,
-      player1_id: playerIds[0] ?? null,
-      player2_id: playerIds[1] ?? null,
-      player3_id: playerIds[2] ?? null,
-      player4_id: playerIds[3] ?? null,
+      player1_id: player1Id,
+      player2_id: player2Id,
+      player3_id: player3Id,
+      player4_id: player4Id,
       // Only meaningful once the game is Done — moving a game back to
       // Queued/Ongoing clears out any winner/score it had.
       winner_team: status === "Done" ? winnerTeam : null,
