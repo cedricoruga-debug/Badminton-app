@@ -39,6 +39,11 @@ export function NewGameButton({
   // Game (variant="icon") is the one place you're deliberately working a
   // specific past date, so that's the one that keeps the picker.
   const showSessionPicker = variant === "icon";
+  // The Games page's Add Game is the backup flow for a game you forgot to
+  // log on its actual date — not the live queueing tool the dashboard's New
+  // Game is. It doesn't need the floating per-player history cards or the
+  // fuller chip styling, so keep it light (see GameFormFields' `compact`).
+  const compact = variant === "icon";
 
   return (
     <Modal
@@ -68,6 +73,7 @@ export function NewGameButton({
           sessions={sessions}
           defaultSessionId={sessionId}
           showSessionPicker={showSessionPicker}
+          compact={compact}
           players={players}
           games={games}
           close={close}

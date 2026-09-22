@@ -138,6 +138,7 @@ export function GameFormFields({
   sessions,
   defaultSessionId,
   showSessionPicker = true,
+  compact = false,
   players,
   games = [],
   defaultStatus = "Queued",
@@ -164,6 +165,16 @@ export function GameFormFields({
    * `defaultSessionId` is still submitted via a hidden field. Defaults to
    * true so Edit Game (which doesn't pass this) is unaffected. */
   showSessionPicker?: boolean;
+  /** Trims this form down for the low-stakes "I forgot to log a game"
+   * backup flow (the Games page's Add Game, variant="icon" in
+   * NewGameButton): skips the floating per-player game-history cards
+   * entirely (no ResizeObserver/portal work) and drops the picker chips'
+   * hover shadow/transition-all down to a plain color transition, so
+   * opening it stays light — that flow doesn't need the live "who's played
+   * with who" record the main New Game modal shows while actively
+   * queueing. Defaults to false everywhere else (the dashboard's New Game,
+   * and Edit Game). */
+  compact?: boolean;
   players: PlayerSessionWithPlayer[];
   /** Every other game in this session (any status) — used only to color the
    * player picker below by who's free, already queued elsewhere, or
@@ -216,6 +227,10 @@ export function GameFormFields({
   const [panelMaxHeight, setPanelMaxHeight] = useState<number | null>(null);
 
   useLayoutEffect(() => {
+    // compact mode never renders the history-panel portal below, so skip
+    // setting up the ResizeObserver/resize-listener machinery for it too —
+    // no point tracking a position nothing uses.
+    if (compact) return;
     const dialog = formRef.current?.closest<HTMLElement>("[data-modal-dialog]");
     if (!dialog) return;
     const update = () => {
@@ -231,7 +246,7 @@ export function GameFormFields({
       ro.disconnect();
       window.removeEventListener("resize", update);
     };
-  }, []);
+  }, [compact]);
 
   // Who's already spoken for this session, excluding this very game (its
   // own roster shouldn't count as "already busy" — those players show as
@@ -448,9 +463,11 @@ export function GameFormFields({
                     className="peer sr-only"
                   />
                   <span
-                    className={`flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-sm font-medium transition-all ${
+                    className={`flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-sm font-medium ${
+                      compact ? "transition-colors" : "transition-all"
+                    } ${
                       checked
-                        ? "cursor-pointer border-transparent bg-brand text-white shadow-sm shadow-brand/30"
+                        ? `cursor-pointer border-transparent bg-brand text-white ${compact ? "" : "shadow-sm shadow-brand/30"}`
                         : disabled
                           ? `cursor-not-allowed opacity-40 ${statusClasses}`
                           : `cursor-pointer ${statusClasses}`
@@ -554,8 +571,10 @@ export function GameFormFields({
        * an extra click or leaving the form. Laid out in a row (wrapping if
        * it doesn't fit) rather than stacked, positioned just under the
        * modal's own dialog box (see panelTop above) so it sits close to
-       * the form instead of pinned to the bottom of the screen. */}
-      {filledCount > 0 &&
+       * the form instead of pinned to the bottom of the screen. Skipped
+       * entirely in compact mode — see the `compact` prop doc above. */}
+      {!compact &&
+        filledCount > 0 &&
         createPortal(
           <div
             className={`pointer-events-none fixed inset-x-0 z-[60] flex flex-row flex-wrap items-start justify-center gap-2 px-4 ${
