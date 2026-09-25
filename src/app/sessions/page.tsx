@@ -71,7 +71,9 @@ export default async function SessionsPage(props: PageProps<"/sessions">) {
                     >
                       <span>{new Date(s.session_date).toLocaleDateString("en-US")}</span>
                       <span className={active ? "text-white/70" : "text-black/30"}>
-                        ₱{s.total_payable.toFixed(0)}
+                        {s.total_players > 0 && s.paid_count === s.total_players
+                          ? `₱${s.total_earning.toFixed(0)}`
+                          : `${s.paid_count}/${s.total_players} paid`}
                       </span>
                     </Link>
                   </li>
@@ -104,6 +106,11 @@ export default async function SessionsPage(props: PageProps<"/sessions">) {
               )}
               {selectedSession && (
                 <dl className="mb-6 grid grid-cols-2 gap-x-6 gap-y-4 border-t border-black/10 pt-3 text-sm landscape:grid-cols-3 landscape:gap-x-8">
+                  <Stat
+                    label="Paid players"
+                    value={`${paidPlayers.length}/${selectedPlayers.length}`}
+                    emphasize
+                  />
                   <Stat
                     label="Total payable"
                     value={`₱${selectedSession.total_payable.toFixed(2)}`}

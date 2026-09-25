@@ -28,6 +28,11 @@ const PICKER_STATUS_STYLES = {
 } as const;
 
 
+/** How many alternative foursomes Suggest cycles through before repeating —
+ * a small fixed cap rather than something open-ended, so clicking through
+ * every option and coming back around feels intentional, not endless. */
+const SUGGESTION_SET_COUNT = 3;
+
 /**
  * "Magic Queue"-style auto-suggest: picks up to 4 players for this game
  * instead of the queue master choosing every one by hand. Considers the
@@ -44,23 +49,38 @@ const PICKER_STATUS_STYLES = {
  * elsewhere (spreads the *upcoming* queue fairly instead of only caring
  * who's free this exact instant), then hasn't played yet / waited longest
  * since their last game, then fewest games played overall as a final
- * tiebreak. Two anti-repeat passes sit on top of that ranking: it first
- * skips anyone currently mid-game on any court (not just the most
- * recently numbered one — a queue master running several courts at once
- * shouldn't get handed someone who's literally out there right now), and
- * if the resulting foursome still turns out to be the exact same 4 people
- * as another already-queued or ongoing game (just re-paired), it swaps
- * one of them out for the next-best alternative so it doesn't suggest a
- * game that's already effectively on the board. Both skips fall back to
- * allowing the repeat rather than suggesting fewer than 4 players, for a
- * small enough roster that avoiding it isn't possible. Pure function so
- * it's easy to reason about independent of the component's render.
+ * tiebreak.
+ *
+ * Returns up to SUGGESTION_SET_COUNT candidate foursomes (not just one) —
+ * the button below cycles through them on repeated clicks, so a queue
+ * master who doesn't love the first pick has a couple of reasonable
+ * alternatives one tap away instead of nothing. Set 1 is the sliding
+ * window `ranked[0:4]` (the single best pick, same as this function used
+ * to return on its own), set 2 is `ranked[1:5]`, set 3 is `ranked[2:6]` —
+ * each shifts the window one player further down the fairness ranking, so
+ * later sets stay close to "who deserves it most" rather than turning into
+ * a random shuffle. Windows collapse toward the end of a small roster
+ * (nowhere left to shift), so a session without enough players for 3
+ * genuinely different groups just returns fewer — cycling then wraps
+ * across whatever's actually distinct instead of repeating an identical
+ * set under a different click.
+ *
+ * Two anti-repeat passes sit on top of the ranking, applied to every
+ * window: each skips anyone currently mid-game on any court (not just the
+ * most recently numbered one), and if a window's foursome still turns out
+ * to be the exact same 4 people as another already-queued or ongoing game
+ * (just re-paired), it swaps one of them out for the next-best alternative
+ * so it doesn't suggest a game that's already effectively on the board.
+ * Both fall back to allowing the repeat rather than suggesting fewer than
+ * 4 players, for a small enough roster that avoiding it isn't possible.
+ * Pure function so it's easy to reason about independent of the
+ * component's render.
  */
-function suggestNextMatch(
+function suggestMatchSets(
   players: PlayerSessionWithPlayer[],
   games: GameForStatus[],
   gameId: string | undefined
-): string[] {
+): string[][] {
   if (players.length === 0) return [];
 
   const maxGameNumber = games.reduce((max, g) => Math.max(max, g.game_number), 0);
@@ -98,7 +118,8 @@ function suggestNextMatch(
       if (a.upcoming !== b.upcoming) return a.upcoming - b.upcoming;
       if (a.wait !== b.wait) return b.wait - a.wait;
       return a.ps.total_games - b.ps.total_games;
-    });
+    })
+    .map(({ ps }) => ps.player.id);
 
   // Everyone currently on a court right now, across every Ongoing game —
   // not just whichever one happens to have the highest game number.
@@ -109,25 +130,12 @@ function suggestNextMatch(
       .filter((id): id is string => Boolean(id))
   );
 
-  function pickFour(exclude: Set<string>): string[] {
-    const picked: string[] = [];
-    for (const { ps } of ranked) {
-      if (picked.length >= 4) break;
-      if (exclude.has(ps.player.id)) continue;
-      picked.push(ps.player.id);
-    }
-    // Couldn't fill 4 without them (small free pool) — take another pass
-    // and include them rather than suggesting fewer than 4 players.
-    if (picked.length < 4) {
-      for (const { ps } of ranked) {
-        if (picked.length >= 4) break;
-        if (!picked.includes(ps.player.id)) picked.push(ps.player.id);
-      }
-    }
-    return picked;
-  }
-
-  let picked = pickFour(currentlyOnCourt);
+  // The pool every window draws from, in priority order. If excluding
+  // on-court players leaves fewer than 4 to work with, fall back to the
+  // full ranked list (include them) rather than being unable to fill a
+  // single window at all.
+  const free = ranked.filter((id) => !currentlyOnCourt.has(id));
+  const pool = free.length >= 4 ? free : ranked;
 
   // Order-independent "who's in this game" fingerprint for every other
   // active (not Done, not this game) game — so re-pairing the exact same
@@ -145,18 +153,37 @@ function suggestNextMatch(
       .map((g) => rosterSignature([g.player1_id, g.player2_id, g.player3_id, g.player4_id]))
   );
 
-  if (picked.length === 4 && activeRosterSignatures.has(rosterSignature(picked))) {
-    for (const { ps } of ranked) {
-      if (picked.includes(ps.player.id) || currentlyOnCourt.has(ps.player.id)) continue;
-      const swapped = [...picked.slice(0, 3), ps.player.id];
-      if (!activeRosterSignatures.has(rosterSignature(swapped))) {
-        picked = swapped;
-        break;
+  const lastWindowStart = Math.max(0, pool.length - 4);
+  const sets: string[][] = [];
+  const seenSignatures = new Set<string>();
+
+  for (let windowStart = 0; windowStart <= lastWindowStart && sets.length < SUGGESTION_SET_COUNT; windowStart++) {
+    let candidate = pool.slice(windowStart, windowStart + 4);
+    if (candidate.length < 4) break; // fewer than 4 people registered at all
+
+    if (activeRosterSignatures.has(rosterSignature(candidate))) {
+      for (const id of pool) {
+        if (candidate.includes(id)) continue;
+        const swapped = [...candidate.slice(0, 3), id];
+        if (!activeRosterSignatures.has(rosterSignature(swapped))) {
+          candidate = swapped;
+          break;
+        }
       }
     }
+
+    const signature = rosterSignature(candidate);
+    if (!seenSignatures.has(signature)) {
+      seenSignatures.add(signature);
+      sets.push(candidate);
+    }
+
+    // The window's already pinned to the last 4 players in the pool —
+    // sliding it further would just repeat the exact same group.
+    if (windowStart === lastWindowStart) break;
   }
 
-  return picked;
+  return sets;
 }
 
 /**
@@ -243,6 +270,12 @@ export function GameFormFields({
   });
   const [status, setStatus] = useState(defaultStatus);
   const [winnerTeam, setWinnerTeam] = useState(defaultWinnerTeam);
+  // Which of Suggest's (up to SUGGESTION_SET_COUNT) candidate foursomes to
+  // hand out next — increments every click so repeated presses cycle
+  // through alternatives instead of reapplying the same pick. Resets to 0
+  // on every fresh mount (a new New Game/Edit Game open), so the very
+  // first click always leads with the single best-ranked suggestion.
+  const [suggestionRound, setSuggestionRound] = useState(0);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [isDeleting, startDeleteTransition] = useTransition();
 
@@ -445,12 +478,15 @@ export function GameFormFields({
           <span className="flex items-center gap-2">
             <button
               type="button"
-              title="Auto-pick 4 players — weighted by fewest games already queued, then who's waited longest"
+              title="Auto-pick 4 players — weighted by fewest games already queued, then who's waited longest. Click again for another option."
               onClick={() => {
-                const picked = suggestNextMatch(players, games, gameId);
+                const sets = suggestMatchSets(players, games, gameId);
+                if (sets.length === 0) return;
+                const picked = sets[suggestionRound % sets.length];
                 const padded: (string | null)[] = [...picked];
                 while (padded.length < 4) padded.push(null);
                 setSelected(padded.slice(0, 4));
+                setSuggestionRound((round) => round + 1);
               }}
               className="rounded-full border border-brand/30 px-2 py-0.5 text-[11px] font-medium text-brand transition-colors hover:bg-brand-light"
             >

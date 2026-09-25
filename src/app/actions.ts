@@ -104,7 +104,6 @@ export async function toggleGameStatus(gameId: string, currentStatus: string) {
   revalidatePath("/");
   revalidatePath("/games");
   revalidatePath("/sessions");
-  revalidatePath("/player-sessions");
 }
 
 const STATUS_FORWARD: Record<string, "Queued" | "Ongoing" | "Done"> = {
@@ -130,7 +129,6 @@ export async function advanceGameStatus(gameId: string, currentStatus: string) {
   revalidatePath("/");
   revalidatePath("/games");
   revalidatePath("/sessions");
-  revalidatePath("/player-sessions");
 }
 
 /**
@@ -156,7 +154,6 @@ export async function finishGameWithWinner(gameId: string, winnerTeam: "team1" |
   revalidatePath("/");
   revalidatePath("/games");
   revalidatePath("/sessions");
-  revalidatePath("/player-sessions");
 }
 
 const PAYMENT_CYCLE: Array<"Unpaid" | "Cash" | "Gcash"> = ["Unpaid", "Gcash", "Cash"];
@@ -179,7 +176,6 @@ export async function cyclePaymentMethod(
   if (error) throw new Error(error.message);
   revalidatePath("/");
   revalidatePath("/sessions");
-  revalidatePath("/player-sessions");
 }
 
 /** Retract a player's payment — sends them straight back to Unpaid so the
@@ -196,7 +192,6 @@ export async function unmarkPaid(playerSessionId: string) {
   if (error) throw new Error(error.message);
   revalidatePath("/");
   revalidatePath("/sessions");
-  revalidatePath("/player-sessions");
 }
 
 /** Mark a player's session as paid via a specific method (Cash or GCash). */
@@ -211,7 +206,6 @@ export async function markPaid(playerSessionId: string, method: "Cash" | "Gcash"
   if (error) throw new Error(error.message);
   revalidatePath("/");
   revalidatePath("/sessions");
-  revalidatePath("/player-sessions");
 }
 
 /**
@@ -417,7 +411,6 @@ export async function removePlayerFromSession(playerSessionId: string, sessionId
 
   revalidatePath("/");
   revalidatePath("/sessions");
-  revalidatePath("/player-sessions");
 }
 
 /**
@@ -439,7 +432,6 @@ export async function setPlayerDiscount(playerSessionId: string, discountPercent
 
   revalidatePath("/");
   revalidatePath("/sessions");
-  revalidatePath("/player-sessions");
 }
 
 /**
@@ -458,24 +450,6 @@ export async function setDoneForSession(playerSessionId: string, done: boolean) 
 
   revalidatePath("/");
   revalidatePath("/sessions");
-  revalidatePath("/player-sessions");
-}
-
-/**
- * Add an existing player to a session (the "PlayerSessions Form" /
- * Recent Session "+ Add" shortcut). Starts at 0 games; court_share comes
- * from registerPlayerForSession's even split across the session's headcount.
- */
-export async function addPlayerToSession(formData: FormData) {
-  const sessionId = String(formData.get("session_id") ?? "");
-  const playerId = String(formData.get("player_id") ?? "");
-  if (!sessionId || !playerId) throw new Error("Missing session or player");
-
-  const supabase = await createClient();
-  await registerPlayerForSession(supabase, sessionId, playerId);
-
-  revalidatePath("/");
-  redirect("/");
 }
 
 /**
@@ -653,7 +627,6 @@ export async function deleteSession(sessionId: string) {
   revalidatePath("/");
   revalidatePath("/sessions");
   revalidatePath("/games");
-  revalidatePath("/player-sessions");
   redirect("/sessions");
 }
 
@@ -746,7 +719,6 @@ export async function createGame(formData: FormData) {
   revalidatePath("/");
   revalidatePath("/games");
   revalidatePath("/sessions");
-  revalidatePath("/player-sessions");
   redirect(redirectTo);
 }
 
@@ -787,7 +759,6 @@ export async function deleteGame(gameId: string, sessionId: string) {
   revalidatePath("/");
   revalidatePath("/games");
   revalidatePath("/sessions");
-  revalidatePath("/player-sessions");
 }
 
 /** Edit an existing game's session/date, status, and players (from clicking a game on the dashboard). */
@@ -851,6 +822,5 @@ export async function updateGame(formData: FormData) {
   revalidatePath("/");
   revalidatePath("/games");
   revalidatePath("/sessions");
-  revalidatePath("/player-sessions");
   redirect("/");
 }

@@ -132,23 +132,49 @@ export async function getSessionById(id: string): Promise<Session | null> {
   return data;
 }
 
-export type SessionWithTotal = Session & { total_payable: number };
+export type SessionWithTotal = Session & {
+  total_payable: number;
+  /** How many of this session's registered players have paid so far. */
+  paid_count: number;
+  /** How many players are registered for this session, paid or not. */
+  total_players: number;
+  /** Built-in margin (payable minus raw court+shuttle cost) earned from
+   * players who have actually paid — same definition as sessions/page.tsx's
+   * per-selected-session calculation, just summed here for every session. */
+  total_earning: number;
+};
 
-/** All sessions, newest first, each with its total payable (summed from player_sessions). */
+/** All sessions, newest first, each with its total payable and payment
+ * status (summed/counted from the joined player_sessions rows). */
 export async function getAllSessions(): Promise<SessionWithTotal[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("sessions")
-    .select("*, player_sessions(payable)")
+    .select("*, player_sessions(payable, payment_method, court_share, shuttle_share)")
     .order("session_date", { ascending: false });
   if (error) {
     console.error("[getAllSessions] Supabase error:", error);
   }
   return (data ?? []).map((s) => {
-    const { player_sessions, ...session } = s as Session & { player_sessions: { payable: number }[] };
+    const { player_sessions, ...session } = s as Session & {
+      player_sessions: {
+        payable: number;
+        payment_method: string | null;
+        court_share: number;
+        shuttle_share: number;
+      }[];
+    };
+    const rows = player_sessions ?? [];
+    const paidRows = rows.filter((ps) => ps.payment_method !== null);
     return {
       ...(session as Session),
-      total_payable: (player_sessions ?? []).reduce((sum, ps) => sum + Number(ps.payable), 0),
+      total_payable: rows.reduce((sum, ps) => sum + Number(ps.payable), 0),
+      paid_count: paidRows.length,
+      total_players: rows.length,
+      total_earning: paidRows.reduce(
+        (sum, ps) => sum + (Number(ps.payable) - Number(ps.court_share) - Number(ps.shuttle_share)),
+        0
+      ),
     };
   });
 }

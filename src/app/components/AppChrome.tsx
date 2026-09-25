@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { IconShuttle } from "@/app/components/icons";
 import { OfflineBanner } from "@/app/components/OfflineBanner";
 import { SidePanel } from "@/app/components/SidePanel";
+import { registerServiceWorker } from "@/lib/registerSW";
 import { createClient } from "@/lib/supabase/client";
 import type { AppSettings } from "@/lib/types";
 
@@ -123,6 +124,15 @@ export function AppChrome({
 }) {
   const pathname = usePathname();
   const isChromeless = CHROMELESS_PATHS.includes(pathname);
+
+  // Registers the service worker that backs installability + the
+  // dashboard's offline support (see public/sw.js and
+  // src/lib/registerSW.ts) — app-wide, not just the dashboard, so the whole
+  // thing can be added to a home screen even though only `/` actually
+  // renders from cache when offline today.
+  useEffect(() => {
+    registerServiceWorker();
+  }, []);
 
   // Realtime subscribes to tables an anonymous /join visitor has no read
   // access to (RLS) — pointless for them and just noise/errors in the

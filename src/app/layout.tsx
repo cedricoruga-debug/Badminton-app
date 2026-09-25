@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 // Rounder and friendlier than the old plain Arial fallback — fits a casual
 // Saturday-badminton app better than a default system font. Self-hosted via
 // @fontsource (the font files ship in the npm package itself) rather than
@@ -21,6 +21,17 @@ const APP_TITLE = "Queuing App by Ced";
 export const metadata: Metadata = {
   title: APP_TITLE,
   description: "Saturday badminton session queuing and fee tracker",
+  manifest: "/manifest.json",
+  icons: {
+    icon: "/icons/icon-512.png",
+    apple: "/icons/icon-512.png",
+  },
+};
+
+// A separate export from `metadata` above — Next.js splits viewport-related
+// tags (theme-color included) out on purpose, see generate-viewport docs.
+export const viewport: Viewport = {
+  themeColor: "#ec4899",
 };
 
 /** Whether the signed-in visitor is an admin — decides whether the nav

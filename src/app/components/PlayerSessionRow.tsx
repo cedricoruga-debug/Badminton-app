@@ -67,16 +67,21 @@ export function PlayerSessionRow({
                 open();
               }
             }}
-            className="-mx-2 flex cursor-pointer items-start justify-between gap-2 rounded-lg px-2 py-3 transition-colors hover:bg-black/[0.03]"
+            className="-mx-2 flex cursor-pointer flex-col gap-1.5 rounded-lg px-2 py-3 transition-colors hover:bg-black/[0.03]"
           >
-            <div className="min-w-0">
-              <p className="truncate font-semibold">{ps.player.name}</p>
-              <p className="text-sm text-black/50">{ps.total_games}</p>
+            {/* Name gets its own full-width line — sharing a row with the
+             * status/payment badges below squeezed it down to a couple of
+             * characters in a narrow column (the dashboard's Players panel
+             * in particular). Only the payable amount, a single short
+             * number, shares this line. */}
+            <div className="flex min-w-0 items-baseline justify-between gap-2">
+              <p className="min-w-0 truncate font-semibold">{ps.player.name}</p>
+              <p className="flex-none font-semibold">₱{ps.payable.toFixed(2)}</p>
             </div>
 
-            <div className="flex flex-none flex-col items-end gap-2">
-              <p className="font-semibold">₱{ps.payable.toFixed(2)}</p>
-              <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between gap-2">
+              <p className="flex-none text-sm text-black/50">{ps.total_games}</p>
+              <div className="flex min-w-0 items-center gap-2">
                 <button
                   type="button"
                   disabled={isPending}
