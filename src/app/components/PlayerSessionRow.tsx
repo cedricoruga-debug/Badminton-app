@@ -85,9 +85,20 @@ function SetRecordBar({
 export function PlayerSessionRow({
   ps,
   games = [],
+  sessionDiscountTotal = 0,
+  sessionPlayerCount = 0,
 }: {
   ps: PlayerSessionWithPlayer;
   games?: GameWithPlayers[];
+  /** The session's discount_total (see schema.sql) — when set (> 0), this
+   * player's discount_percent is a share of it split evenly across every
+   * registered player, recomputed on the server (recomputePlayerGameCounts)
+   * rather than editable here. 0 = no session-wide discount in use; the
+   * per-player editor below stays live. */
+  sessionDiscountTotal?: number;
+  /** The session's player_count, just for the "split evenly across N
+   * players" note — purely descriptive. */
+  sessionPlayerCount?: number;
 }) {
   const [isPending, startTransition] = useTransition();
   const [payPending, startPayTransition] = useTransition();
@@ -300,7 +311,7 @@ export function PlayerSessionRow({
             <div>
               <div className="mb-2 flex items-center justify-between">
                 <p className="text-xs font-semibold uppercase tracking-wide text-black/40">Discount</p>
-                {!editingDiscount && (
+                {!sessionDiscountTotal && !editingDiscount && (
                   <button
                     type="button"
                     disabled={discountPending}
@@ -314,7 +325,17 @@ export function PlayerSessionRow({
                   </button>
                 )}
               </div>
-              {editingDiscount ? (
+              {sessionDiscountTotal > 0 ? (
+                // Session-wide discount is in use (see EditSessionButton) —
+                // this player's discount_percent is derived automatically
+                // from an equal split of it, so it's shown, not edited here.
+                <p className="text-sm text-black/60">
+                  <span className="font-medium text-emerald-700">{ps.discount_percent}% off</span>
+                  {" — "}
+                  ₱{sessionDiscountTotal.toFixed(2)} split evenly
+                  {sessionPlayerCount > 0 ? ` across ${sessionPlayerCount} players` : ""}
+                </p>
+              ) : editingDiscount ? (
                 <div className="flex items-center gap-2">
                   <input
                     type="number"

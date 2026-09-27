@@ -22,6 +22,15 @@ import { createClient } from "@/lib/supabase/server";
  * and payable is a generated column off (court_share + shuttle_share) —
  * mirroring the original sheet's =CEILING(E+F+10, 10) rounding, since
  * ceil((court_share + shuttle_share) / 10) * 10 + 10 is the same formula.
+ *
+ * Also re-derives every player's discount_percent from the session's
+ * discount_total (see schema.sql) whenever one is set, so the queue
+ * master's single "split this evenly" peso amount stays an equal split as
+ * court_share/shuttle_share move — a plain percentage can't do that on its
+ * own since shuttle_share differs per player by games played. When
+ * discount_total is 0 (the default — no session-wide discount in use),
+ * each player's discount_percent is left exactly as-is, so the older
+ * per-player "Add discount" flow keeps working unaffected.
  */
 async function recomputePlayerGameCounts(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -43,10 +52,10 @@ async function recomputePlayerGameCounts(
       .in("status", ["Ongoing", "Done"]),
     supabase
       .from("sessions")
-      .select("court_share_per_player, shuttle_fee_per_game")
+      .select("court_share_per_player, shuttle_fee_per_game, discount_total")
       .eq("id", sessionId)
       .single(),
-    supabase.from("player_sessions").select("id, player_id").eq("session_id", sessionId),
+    supabase.from("player_sessions").select("id, player_id, discount_percent").eq("session_id", sessionId),
   ]);
   if (gamesError) throw new Error(gamesError.message);
   if (sessionError) throw new Error(sessionError.message);
@@ -61,6 +70,9 @@ async function recomputePlayerGameCounts(
 
   const courtSharePerPlayer = session.court_share_per_player;
   const shuttleFeePerGame = session.shuttle_fee_per_game;
+  const discountTotal = session.discount_total ?? 0;
+  const payerCount = (playerSessions ?? []).length;
+  const equalShare = payerCount > 0 ? discountTotal / payerCount : 0;
 
   // One request updating every player_session row at once, instead of one
   // request per player (this function runs after every game
@@ -73,13 +85,23 @@ async function recomputePlayerGameCounts(
   if ((playerSessions ?? []).length > 0) {
     const rows = playerSessions!.map((ps) => {
       const totalGames = counts.get(ps.player_id) ?? 0;
+      const courtShare = courtSharePerPlayer;
+      const shuttleShare = totalGames * shuttleFeePerGame;
+      const base = courtShare + shuttleShare;
+      // discountTotal === 0 means the session isn't using the equal-split
+      // feature, so this player's discount_percent is passed through
+      // unchanged rather than forced to 0 — that would silently wipe out a
+      // discount the queue master set by hand on the player themselves.
+      const discountPercent =
+        discountTotal > 0 ? (base > 0 ? Math.min(100, Math.round((equalShare / base) * 10000) / 100) : 0) : ps.discount_percent;
       return {
         id: ps.id,
         session_id: sessionId,
         player_id: ps.player_id,
         total_games: totalGames,
-        court_share: courtSharePerPlayer,
-        shuttle_share: totalGames * shuttleFeePerGame,
+        court_share: courtShare,
+        shuttle_share: shuttleShare,
+        discount_percent: discountPercent,
       };
     });
     const { error } = await supabase.from("player_sessions").upsert(rows, { onConflict: "id" });
@@ -589,6 +611,7 @@ export async function updateSession(formData: FormData) {
   const hours = Number(formData.get("hours") ?? 0) || 0;
   const feePerHour = Number(formData.get("fee_per_hour") ?? 0) || 0;
   const shuttleTubeCost = Number(formData.get("shuttle_tube_cost") ?? 0) || 0;
+  const discountTotal = Math.max(0, Number(formData.get("discount_total") ?? 0) || 0);
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -597,6 +620,7 @@ export async function updateSession(formData: FormData) {
       hours,
       fee_per_hour: feePerHour,
       shuttle_tube_cost: shuttleTubeCost,
+      discount_total: discountTotal,
     })
     .eq("id", sessionId);
 
@@ -607,7 +631,8 @@ export async function updateSession(formData: FormData) {
   // but each player's stored court_share/shuttle_share — and so their
   // generated `payable` — don't follow along on their own. Without this,
   // editing a session's cost inputs silently leaves everyone's amount due
-  // stuck at whatever it was before the edit.
+  // stuck at whatever it was before the edit. This also re-splits
+  // discount_total evenly across every player (see its doc comment above).
   await recomputePlayerGameCounts(supabase, sessionId);
 
   revalidatePath("/");

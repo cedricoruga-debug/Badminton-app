@@ -21,6 +21,11 @@ export type Session = {
   shuttle_fee_per_game: number;
   player_count: number;
   court_share_per_player: number;
+  /** Flat peso amount, entered once for the whole session, split evenly
+   * across every registered player by recomputing each one's
+   * discount_percent (see recomputePlayerGameCounts). 0 = no session-wide
+   * discount — per-player discount_percent is then set manually instead. */
+  discount_total: number;
   created_at: string;
 };
 

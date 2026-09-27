@@ -68,6 +68,17 @@ create table if not exists sessions (
     case when player_count = 0 then 0 else (hours * fee_per_hour) / player_count end
   ) stored,
 
+  -- Flat peso amount the queue master enters ONCE for the whole session
+  -- (e.g. a sponsor covering part of the cost) — split evenly across every
+  -- registered player_sessions row for this session by converting it into
+  -- each player's discount_percent, recomputed alongside total_games/
+  -- court_share/shuttle_share every time recomputePlayerGameCounts runs
+  -- (see src/app/actions.ts), so the equal split stays true as games are
+  -- logged or the session's cost inputs change. 0 = no session-wide
+  -- discount; the per-player discount_percent field on player_sessions is
+  -- then left exactly as the queue master set it, unmanaged by this.
+  discount_total numeric(10, 2) not null default 0 check (discount_total >= 0),
+
   created_at timestamptz not null default now()
 );
 
@@ -75,6 +86,11 @@ create table if not exists sessions (
 alter table sessions add column if not exists join_code text;
 alter table sessions drop constraint if exists sessions_join_code_key;
 alter table sessions add constraint sessions_join_code_key unique (join_code);
+
+-- safe to re-run against a database created before discount_total existed
+alter table sessions add column if not exists discount_total numeric(10, 2) not null default 0;
+alter table sessions drop constraint if exists sessions_discount_total_check;
+alter table sessions add constraint sessions_discount_total_check check (discount_total >= 0);
 
 -- ---------------------------------------------------------------------------
 -- games   (was: AppSheet "Games" table)

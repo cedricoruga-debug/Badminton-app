@@ -73,6 +73,23 @@ export function EditSessionButton({ session }: { session: Session }) {
             />
           </div>
 
+          <div className="border-t border-black/10 pt-4">
+            <label className="mb-1 block text-sm font-medium text-brand">Session discount</label>
+            <input
+              type="number"
+              name="discount_total"
+              step="1"
+              min="0"
+              defaultValue={session.discount_total}
+              className="w-full rounded border border-black/15 px-3 py-2 text-sm"
+            />
+            <p className="mt-1 text-xs text-black/40">
+              {session.player_count > 0
+                ? `₱ split evenly across all ${session.player_count} registered players. Leave at 0 to set discounts per player instead.`
+                : "₱ split evenly across whoever registers for this session. Leave at 0 to set discounts per player instead."}
+            </p>
+          </div>
+
           <div className="flex items-center justify-between border-t border-black/10 pt-4">
             <div>
               {confirmingDelete ? (
