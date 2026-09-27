@@ -47,11 +47,27 @@ function winSetStats(games: GameWithPlayers[], playerId: string) {
  * outline, not a "bad" color; a Done game with no winner recorded and a
  * clean loss are different things, but neither is failure) — proportional
  * to how many Done sets make up each. Renders nothing when nothing's been
- * played yet (no bar is more honest than an empty/grey one). */
-function SetRecordBar({ wins, splits, losses, played }: { wins: number; splits: number; losses: number; played: number }) {
+ * played yet (no bar is more honest than an empty/grey one). `widthClassName`
+ * defaults to filling its container (the popup's wider "Set record"
+ * section); the compact row passes a fixed narrow width instead so the bar
+ * stays a small accent next to the games-played count, not a second full
+ * line. */
+function SetRecordBar({
+  wins,
+  splits,
+  losses,
+  played,
+  widthClassName = "flex-1",
+}: {
+  wins: number;
+  splits: number;
+  losses: number;
+  played: number;
+  widthClassName?: string;
+}) {
   if (played === 0) return null;
   return (
-    <div className="flex h-1.5 flex-1 overflow-hidden rounded-full bg-black/5">
+    <div className={`flex h-1.5 flex-none overflow-hidden rounded-full bg-black/5 ${widthClassName}`}>
       {wins > 0 && <span style={{ width: `${(wins / played) * 100}%` }} className="bg-emerald-500" />}
       {splits > 0 && <span style={{ width: `${(splits / played) * 100}%` }} className="bg-amber-400" />}
       {losses > 0 && <span style={{ width: `${(losses / played) * 100}%` }} className="bg-black/15" />}
@@ -128,7 +144,21 @@ export function PlayerSessionRow({
             </div>
 
             <div className="flex items-center justify-between gap-2">
-              <p className="flex-none text-sm text-black/50">{ps.total_games}</p>
+              <div className="flex flex-none items-center gap-1.5">
+                <span className="text-sm text-black/50">{ps.total_games}</span>
+                {/* Set record accent — a narrow (roughly a third of the old
+                 * full-width bar) won/split/lost bar plus win rate, right on
+                 * the games-played line instead of a line of its own. Same
+                 * win-rate math as the dashboard's Today's MVP. */}
+                {setStats.played > 0 && (
+                  <>
+                    <SetRecordBar {...setStats} widthClassName="w-8" />
+                    <span className="text-[10px] font-medium text-black/40">
+                      {Math.round((setStats.rate ?? 0) * 100)}%
+                    </span>
+                  </>
+                )}
+              </div>
               <div className="flex min-w-0 items-center gap-2">
                 <button
                   type="button"
@@ -215,18 +245,6 @@ export function PlayerSessionRow({
                  * below. */}
               </div>
             </div>
-
-            {/* Set record — only once there's at least one Done game, so a
-             * player who hasn't played yet doesn't carry an empty bar
-             * around. Same win-rate math as the dashboard's Today's MVP. */}
-            {setStats.played > 0 && (
-              <div className="flex items-center gap-2">
-                <SetRecordBar {...setStats} />
-                <span className="flex-none text-[10px] font-medium text-black/40">
-                  {Math.round((setStats.rate ?? 0) * 100)}%
-                </span>
-              </div>
-            )}
           </div>
         )}
       >
