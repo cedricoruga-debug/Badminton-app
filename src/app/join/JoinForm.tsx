@@ -33,6 +33,31 @@ type QueueRow = {
 
 type RosterPlayer = { id: string; name: string };
 
+/** Remembers the "Your name" field on this device (localStorage) so a
+ * player who's requested a set before doesn't have to retype it every
+ * time — filled in from here on RequestSetForm's first render, and
+ * refreshed on every successful send in case they edit it. Not tied to any
+ * player identity, just this browser: a shared/kiosk device would show
+ * whoever typed it last, same as the join code itself already does. */
+const REQUESTED_BY_STORAGE_KEY = "badminton-requested-by-name";
+
+function readSavedRequestedByName(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    return window.localStorage.getItem(REQUESTED_BY_STORAGE_KEY) ?? "";
+  } catch {
+    return ""; // storage blocked/unavailable — just start blank
+  }
+}
+
+function saveRequestedByName(name: string) {
+  try {
+    if (name) window.localStorage.setItem(REQUESTED_BY_STORAGE_KEY, name);
+  } catch {
+    // storage blocked/full — not worth surfacing an error for a convenience save
+  }
+}
+
 /** How often to silently re-fetch the queue while this page is open — often
  * enough that "who's next" stays useful, not so often it's hammering the
  * database for what's really just a handful of concurrent viewers at most. */
@@ -410,7 +435,7 @@ function RequestSetForm({
   const [roster, setRoster] = useState<RosterPlayer[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
-  const [requestedByName, setRequestedByName] = useState("");
+  const [requestedByName, setRequestedByName] = useState(readSavedRequestedByName);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, startSubmitting] = useTransition();
 
@@ -447,15 +472,17 @@ function RequestSetForm({
       return;
     }
     startSubmitting(async () => {
+      const trimmedName = requestedByName.trim();
       const { error } = await supabase.rpc("request_game", {
         code,
         player_ids: selected,
-        requested_by: requestedByName.trim() || null,
+        requested_by: trimmedName || null,
       });
       if (error) {
         setSubmitError(error.message);
         return;
       }
+      saveRequestedByName(trimmedName);
       onSent();
     });
   }
