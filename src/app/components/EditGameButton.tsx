@@ -58,6 +58,7 @@ export function EditGameButton({
           defaultWinnerTeam={game.winner_team}
           defaultScore1={game.score1}
           defaultScore2={game.score2}
+          defaultRequestedBy={game.requested_by}
           submitLabel="Save changes"
           close={close}
         />

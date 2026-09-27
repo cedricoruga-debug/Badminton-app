@@ -85,7 +85,9 @@ create table if not exists games (
   session_id uuid not null references sessions(id) on delete cascade,
   game_number integer not null,
   game_date date not null,
-  status text not null default 'Queued' check (status in ('Queued', 'Ongoing', 'Done')),
+  -- 'Requested' = submitted by a player from the public /join page, not yet
+  -- approved by the queue master — see "Public game requests" below.
+  status text not null default 'Queued' check (status in ('Requested', 'Queued', 'Ongoing', 'Done')),
   player1_id uuid references players(id),
   player2_id uuid references players(id),
   player3_id uuid references players(id),
@@ -96,13 +98,21 @@ create table if not exists games (
   winner_team text check (winner_team is null or winner_team in ('team1', 'team2')),
   score1 integer,
   score2 integer,
+  -- Free-text name a player typed in on the public /join "Request a set"
+  -- form (see request_game below) — who to credit/ask when the queue master
+  -- reviews it. Null for every game logged the normal way (queue master's
+  -- own New Game / Edit Game forms never set this).
+  requested_by text,
   created_at timestamptz not null default now(),
   unique (session_id, game_number)
 );
 
 -- safe to re-run against a database created before "Ongoing" existed
 alter table games drop constraint if exists games_status_check;
-alter table games add constraint games_status_check check (status in ('Queued', 'Ongoing', 'Done'));
+alter table games add constraint games_status_check check (status in ('Requested', 'Queued', 'Ongoing', 'Done'));
+
+-- safe to re-run against a database created before requested_by existed
+alter table games add column if not exists requested_by text;
 
 -- safe to re-run against a database created before winner/score existed
 alter table games add column if not exists winner_team text;
@@ -179,23 +189,35 @@ insert into app_settings (id) values (1)
   on conflict (id) do nothing;
 
 -- ---------------------------------------------------------------------------
--- Public queue viewing
+-- Public queue viewing + game requests
 -- The public /join page lets anyone with a session's 6-digit join_code see
--- a live, read-only view of who's playing now and who's up next — no login,
--- no registration, nothing for the queue master to approve. (An earlier
+-- a live view of who's playing now, who's up next, and any pending "set
+-- requests" — no login, no registration required to just look. (An earlier
 -- version had visitors submit a "join request" into a join_requests table
--- for the queue master to approve — dropped below. A viewer here isn't
--- asking to be added to the roster, so there was never anything to
--- approve; players are still added by the queue master via the New Player
--- button, same as always.) These two functions are the ONLY read access an
--- anonymous visitor has — security definer runs them with the function
--- owner's privileges, bypassing RLS *only* for the exact columns selected,
--- never the full sessions/games tables (which also hold cost/fee data and
--- far more than a viewer needs).
+-- for the queue master to approve — dropped below. A viewer asking to be
+-- added to the roster is still a manual queue-master job, via New
+-- Player.) These functions are the ONLY access an anonymous visitor has —
+-- security definer runs them with the function owner's privileges,
+-- bypassing RLS *only* for the exact columns/operation each one does,
+-- never open read/write access to the sessions/games/players tables
+-- themselves (which also hold cost/fee data and far more than a viewer
+-- needs).
+--
+-- request_game is the one WRITE anon gets: a player who's checking the
+-- queue can request a set (pick who's playing, from that session's own
+-- roster) instead of asking the queue master to type it in. It lands as a
+-- game row with status 'Requested' — visible in the *queue master's* Games
+-- Queued list same as any other queued game, distinguished by that status,
+-- until approved (moved to 'Queued') or edited/declined there. This is
+-- deliberately different from the old join_requests approval flow: nobody
+-- is being added to or removed from the roster here, so there's no
+-- identity/authorization question to resolve, just "does the queue master
+-- want to run this match" — same as always, just pre-filled.
 -- ---------------------------------------------------------------------------
 
 -- join_requests' whole job (approve/decline) doesn't exist anymore now that
--- /join is view-only — safe to re-run, a no-op once it's already dropped.
+-- /join is view-only for joining — safe to re-run, a no-op once it's
+-- already dropped.
 drop table if exists join_requests;
 
 -- Turns a join_code into a session_id (plus just enough to show "Queue for
@@ -212,23 +234,54 @@ $$;
 
 grant execute on function find_session_by_join_code(text) to anon, authenticated;
 
--- The queue itself: every not-yet-finished game (Queued or Ongoing) for the
--- session matching that code, with player *names* only — no ids, no costs,
--- nothing about players who aren't in one of those games.
-create or replace function get_queue_by_code(code text)
+-- The roster a player picks from when requesting a set: everyone
+-- registered for the session who isn't marked done_for_session, name only
+-- (no costs, no payment info) — same shape the queue master's own player
+-- picker offers, minus everything a viewer doesn't need.
+create or replace function get_roster_by_code(code text)
+returns table (player_id uuid, player_name text)
+language sql
+security definer
+set search_path = public
+as $$
+  select p.id, p.name
+  from player_sessions ps
+  join sessions s on s.id = ps.session_id
+  join players p on p.id = ps.player_id
+  where s.join_code = code
+    and s.status = 'Open'
+    and ps.done_for_session = false
+  order by p.name;
+$$;
+
+grant execute on function get_roster_by_code(text) to anon, authenticated;
+
+-- The queue itself: every not-yet-finished game (Requested, Queued, or
+-- Ongoing) for the session matching that code, with player *names* only —
+-- no ids, no costs, nothing about players who aren't in one of those games.
+-- Requested rows are included (not just Queued/Ongoing) so a player who
+-- just submitted a request — or anyone else checking the queue — can see
+-- it's pending, same list the queue master reviews from their side.
+-- `create or replace` can't change a function's return type (adding
+-- requested_by below counts as a change) — drop first so re-running this
+-- file against a database with the older 6-column version doesn't error.
+drop function if exists get_queue_by_code(text);
+
+create function get_queue_by_code(code text)
 returns table (
   game_number integer,
   status text,
   player1_name text,
   player2_name text,
   player3_name text,
-  player4_name text
+  player4_name text,
+  requested_by text
 )
 language sql
 security definer
 set search_path = public
 as $$
-  select g.game_number, g.status, p1.name, p2.name, p3.name, p4.name
+  select g.game_number, g.status, p1.name, p2.name, p3.name, p4.name, g.requested_by
   from games g
   join sessions s on s.id = g.session_id
   left join players p1 on p1.id = g.player1_id
@@ -237,11 +290,83 @@ as $$
   left join players p4 on p4.id = g.player4_id
   where s.join_code = code
     and s.status = 'Open'
-    and g.status in ('Queued', 'Ongoing')
+    and g.status in ('Requested', 'Queued', 'Ongoing')
   order by g.game_number;
 $$;
 
 grant execute on function get_queue_by_code(text) to anon, authenticated;
+
+-- Submit a "request a set" from the public /join page. player_ids is 1-4
+-- player ids (order matters — same team split as everywhere else: 1st &
+-- 2nd = team1, 3rd & 4th = team2), each of which MUST already be on that
+-- session's roster (checked below) — an anonymous caller can pass any uuid
+-- it wants, so this is the one thing that can't just be trusted from the
+-- client the way the rest of this function's inputs are. requested_by is
+-- an optional free-text name (who to credit/ask), stored as-is, not
+-- matched against the roster.
+--
+-- Lands the new row as status 'Requested' — everything else (game_number,
+-- game_date) mirrors what the queue master's own createGame server action
+-- does, so a requested game slots into the same numbering as one they
+-- added themselves.
+create or replace function request_game(code text, player_ids uuid[], requested_by text default null)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  target_session_id uuid;
+  target_session_date date;
+  registered_count integer;
+  distinct_requested integer;
+  next_game_number integer;
+  p1 uuid;
+  p2 uuid;
+  p3 uuid;
+  p4 uuid;
+begin
+  select id, session_date into target_session_id, target_session_date
+  from sessions
+  where join_code = code and status = 'Open';
+
+  if target_session_id is null then
+    raise exception 'That code doesn''t match an open session.';
+  end if;
+
+  player_ids := array_remove(player_ids, null);
+  distinct_requested := (select count(distinct x) from unnest(player_ids) x);
+  if distinct_requested = 0 then
+    raise exception 'Pick at least one player.';
+  end if;
+  if distinct_requested > 4 then
+    raise exception 'A set is at most 4 players.';
+  end if;
+
+  select count(*) into registered_count
+  from player_sessions
+  where session_id = target_session_id and player_id = any(player_ids);
+  if registered_count <> distinct_requested then
+    raise exception 'One or more players aren''t registered for this session.';
+  end if;
+
+  p1 := player_ids[1];
+  p2 := player_ids[2];
+  p3 := player_ids[3];
+  p4 := player_ids[4];
+
+  select coalesce(max(game_number), 0) + 1 into next_game_number
+  from games
+  where session_id = target_session_id;
+
+  insert into games (session_id, game_number, game_date, status, player1_id, player2_id, player3_id, player4_id, requested_by)
+  values (target_session_id, next_game_number, target_session_date, 'Requested', p1, p2, p3, p4, nullif(trim(requested_by), ''));
+
+  return next_game_number;
+end;
+$$;
+
+grant execute on function request_game(text, uuid[], text) to anon, authenticated;
 
 -- ---------------------------------------------------------------------------
 -- Row Level Security

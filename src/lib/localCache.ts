@@ -63,6 +63,7 @@ function toBareGame(g: GameWithPlayers): Game {
     winner_team: g.winner_team,
     score1: g.score1,
     score2: g.score2,
+    requested_by: g.requested_by,
     created_at: g.created_at,
   };
 }

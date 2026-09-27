@@ -29,7 +29,9 @@ export type Game = {
   session_id: string;
   game_number: number;
   game_date: string;
-  status: "Queued" | "Ongoing" | "Done";
+  /** 'Requested' = submitted by a player from the public /join page,
+   * pending the queue master's approval (moving it to 'Queued') or edit. */
+  status: "Requested" | "Queued" | "Ongoing" | "Done";
   player1_id: string | null;
   player2_id: string | null;
   player3_id: string | null;
@@ -39,6 +41,9 @@ export type Game = {
   winner_team: "team1" | "team2" | null;
   score1: number | null;
   score2: number | null;
+  /** Free-text name from the public "Request a set" form — who asked for
+   * this game. Null for anything the queue master logged themselves. */
+  requested_by: string | null;
   created_at: string;
 };
 

@@ -1,18 +1,24 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
+import { useCallback, useEffect, useState, useTransition, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { IconShuttle } from "@/app/components/icons";
 import { LiveDot } from "@/app/components/LiveDot";
 import { Matchup } from "@/app/components/Matchup";
+import { Modal } from "@/app/components/Modal";
+
+type SupabaseBrowserClient = ReturnType<typeof createClient>;
 
 type QueueGame = {
   gameNumber: number;
-  status: "Queued" | "Ongoing";
+  status: "Requested" | "Queued" | "Ongoing";
   /** [player1, player2, player3, player4] — team1 is the first pair, team2
    * the second, same split as CourtBox. A name is null for an under-filled
    * game (rare, but a game can be logged with fewer than 4 players). */
   players: [string | null, string | null, string | null, string | null];
+  /** Free-text name from the "Request a set" form — only set on a
+   * status: "Requested" row. */
+  requestedBy: string | null;
 };
 
 type QueueRow = {
@@ -22,7 +28,10 @@ type QueueRow = {
   player2_name: string | null;
   player3_name: string | null;
   player4_name: string | null;
+  requested_by: string | null;
 };
+
+type RosterPlayer = { id: string; name: string };
 
 /** How often to silently re-fetch the queue while this page is open — often
  * enough that "who's next" stays useful, not so often it's hammering the
@@ -34,18 +43,19 @@ const POLL_MS = 8000;
  * link (see PUBLIC_PATHS in proxy.ts). A player enters the session's
  * 6-digit code (told to them in person, or scanned off the QR on the
  * dashboard — see JoinQrSection, which links here with ?code=… pre-filled)
- * and sees a live, read-only view of who's playing now and who's up next.
- * That's the whole feature: nothing here registers anyone or needs the
- * queue master's approval — an earlier version did (a two-step "request to
- * join, queue master approves"), but a visitor here only ever wanted to
- * check the queue, so that approval step was just friction for no reason.
- * Players are still added to a session by the queue master themselves
- * (NewPlayerButton's single/bulk add), same as before this page existed.
+ * and sees a live view of who's playing now, who's up next, and any set
+ * they can request themselves (see RequestSetButton below — status
+ * "Requested" until the queue master approves or edits it, same as any
+ * other queued game from their side). Viewing needs nothing from the queue
+ * master; players are still added to a session by the queue master
+ * themselves (NewPlayerButton's single/bulk add), same as always — a
+ * "Request a set" only proposes who plays a game, not who's on the roster.
  *
  * Talks straight to Supabase from the browser (find_session_by_join_code,
- * get_queue_by_code — both security-definer functions granted to `anon`;
- * see schema.sql) rather than through a server action, so polling for live
- * updates below is just a repeated client call, no extra plumbing.
+ * get_queue_by_code, get_roster_by_code, request_game — all security-definer
+ * functions granted to `anon`; see schema.sql) rather than through a server
+ * action, so polling for live updates below is just a repeated client call,
+ * no extra plumbing.
  */
 export function JoinForm({ initialCode = "" }: { initialCode?: string }) {
   const [code, setCode] = useState(initialCode);
@@ -54,42 +64,44 @@ export function JoinForm({ initialCode = "" }: { initialCode?: string }) {
   const [games, setGames] = useState<QueueGame[] | null>(null);
   const [confirmedCode, setConfirmedCode] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  const supabaseRef = useRef(createClient());
+  const [supabase] = useState<SupabaseBrowserClient>(() => createClient());
 
-  async function loadQueue(c: string, opts: { silent?: boolean } = {}) {
-    const supabase = supabaseRef.current;
-
-    const { data: matches, error: lookupError } = await supabase.rpc("find_session_by_join_code", {
-      code: c,
-    });
-    const session = matches?.[0];
-    if (lookupError || !session) {
-      if (!opts.silent) {
-        setError(
-          lookupError?.message ??
-            "That code doesn't match an open session — double-check it with the queue master."
-        );
+  const loadQueue = useCallback(
+    async (c: string, opts: { silent?: boolean } = {}) => {
+      const { data: matches, error: lookupError } = await supabase.rpc("find_session_by_join_code", {
+        code: c,
+      });
+      const session = matches?.[0];
+      if (lookupError || !session) {
+        if (!opts.silent) {
+          setError(
+            lookupError?.message ??
+              "That code doesn't match an open session — double-check it with the queue master."
+          );
+        }
+        return;
       }
-      return;
-    }
 
-    const { data: rows, error: queueError } = await supabase.rpc("get_queue_by_code", { code: c });
-    if (queueError) {
-      if (!opts.silent) setError(queueError.message);
-      return;
-    }
+      const { data: rows, error: queueError } = await supabase.rpc("get_queue_by_code", { code: c });
+      if (queueError) {
+        if (!opts.silent) setError(queueError.message);
+        return;
+      }
 
-    setSessionDate(session.session_date as string);
-    setGames(
-      ((rows as QueueRow[] | null) ?? []).map((r) => ({
-        gameNumber: r.game_number,
-        status: r.status as "Queued" | "Ongoing",
-        players: [r.player1_name, r.player2_name, r.player3_name, r.player4_name],
-      }))
-    );
-    setError(null);
-    setConfirmedCode(c);
-  }
+      setSessionDate(session.session_date as string);
+      setGames(
+        ((rows as QueueRow[] | null) ?? []).map((r) => ({
+          gameNumber: r.game_number,
+          status: r.status as "Requested" | "Queued" | "Ongoing",
+          players: [r.player1_name, r.player2_name, r.player3_name, r.player4_name],
+          requestedBy: r.requested_by,
+        }))
+      );
+      setError(null);
+      setConfirmedCode(c);
+    },
+    [supabase]
+  );
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -117,10 +129,19 @@ export function JoinForm({ initialCode = "" }: { initialCode?: string }) {
     if (!confirmedCode) return;
     const interval = setInterval(() => loadQueue(confirmedCode, { silent: true }), POLL_MS);
     return () => clearInterval(interval);
-  }, [confirmedCode]);
+  }, [confirmedCode, loadQueue]);
 
   if (confirmedCode && games) {
-    return <QueueView sessionDate={sessionDate} games={games} onChangeCode={changeCode} />;
+    return (
+      <QueueView
+        sessionDate={sessionDate}
+        games={games}
+        code={confirmedCode}
+        supabase={supabase}
+        onChangeCode={changeCode}
+        onRequested={() => loadQueue(confirmedCode, { silent: true })}
+      />
+    );
   }
 
   return (
@@ -167,26 +188,34 @@ export function JoinForm({ initialCode = "" }: { initialCode?: string }) {
   );
 }
 
-/** The live, read-only queue itself — "Now playing" (Ongoing games, each
- * shown as a court card) then "Up next" (Queued games, numbered in order).
- * Pure viewing: no controls, nothing tappable except "Change code". Built
- * mobile-first — this is the page most players actually open, usually on
- * their phone while standing courtside — with a branded gradient header
- * (same gradient as the main app's, so a scanning player recognizes it as
- * part of the same thing) rather than the plain utility-page look the code
- * entry screen still uses.
+/** The live queue itself — "Now playing" (Ongoing games, each shown as a
+ * court card), "Up next" (Queued games, numbered in order), and "Requested"
+ * (submitted via RequestSetButton below, pending the queue master's
+ * approval). Built mobile-first — this is the page most players actually
+ * open, usually on their phone while standing courtside — with a branded
+ * gradient header (same gradient as the main app's, so a scanning player
+ * recognizes it as part of the same thing) rather than the plain
+ * utility-page look the code entry screen still uses.
  */
 function QueueView({
   sessionDate,
   games,
+  code,
+  supabase,
   onChangeCode,
+  onRequested,
 }: {
   sessionDate: string | null;
   games: QueueGame[];
+  code: string;
+  supabase: SupabaseBrowserClient;
   onChangeCode: () => void;
+  onRequested: () => void;
 }) {
+  const [confirmation, setConfirmation] = useState<string | null>(null);
   const ongoing = games.filter((g) => g.status === "Ongoing");
   const queued = games.filter((g) => g.status === "Queued");
+  const requested = games.filter((g) => g.status === "Requested");
 
   return (
     <div className="min-h-screen bg-black/[0.02] pb-[max(1.5rem,env(safe-area-inset-bottom))]">
@@ -228,6 +257,12 @@ function QueueView({
        * mobile-hero pattern that makes the page feel like one composed
        * screen instead of a colored banner stacked on plain white. */}
       <div className="mx-auto -mt-5 w-full max-w-sm space-y-3 px-4">
+        {confirmation && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-sm font-medium text-emerald-800">
+            {confirmation}
+          </div>
+        )}
+
         <section className="rounded-2xl bg-white p-4 shadow-soft">
           <h2 className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-black/40">
             <span className="h-2 w-2 flex-none rounded-full bg-rose-500" />
@@ -277,12 +312,235 @@ function QueueView({
           )}
         </section>
 
+        {/* Requested sets — only shown once there's at least one, so a
+         * session with nothing pending doesn't carry an extra empty-state
+         * card around. Pending approval, so styled distinctly (violet)
+         * rather than looking like a confirmed spot in the queue. */}
+        {requested.length > 0 && (
+          <section className="rounded-2xl bg-white p-4 shadow-soft">
+            <h2 className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-black/40">
+              <span className="h-2 w-2 flex-none rounded-full bg-violet-500" />
+              Requested — pending approval
+            </h2>
+            <ul className="space-y-2">
+              {requested.map((g) => (
+                <li key={g.gameNumber} className="rounded-xl border border-violet-100 bg-violet-50/70 px-3.5 py-3">
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-violet-500/80">
+                      Game {g.gameNumber}
+                    </span>
+                    <span className="rounded-full bg-violet-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                      Pending
+                    </span>
+                  </div>
+                  <Matchup team1={g.players.slice(0, 2)} team2={g.players.slice(2, 4)} />
+                  {g.requestedBy && (
+                    <p className="mt-1 text-xs text-violet-700">Requested by {g.requestedBy}</p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        <RequestSetButton code={code} supabase={supabase} onSent={() => { setConfirmation("Request sent — waiting for the queue master to approve it."); onRequested(); }} />
+
         <p className="flex items-center justify-center gap-1.5 pb-1 pt-2 text-[11px] text-black/30">
           <LiveDot dot="bg-emerald-500" ping="bg-emerald-400/70" />
           Updates automatically
         </p>
       </div>
     </div>
+  );
+}
+
+/** Opens a small modal to pick who's playing and submit it as a
+ * status: "Requested" game — the queue master sees it in their own Games
+ * Queued list, distinguished by that status, and approves (moves it to
+ * Queued) or edits it from there, same as any game they'd logged
+ * themselves. */
+function RequestSetButton({
+  code,
+  supabase,
+  onSent,
+}: {
+  code: string;
+  supabase: SupabaseBrowserClient;
+  onSent: () => void;
+}) {
+  return (
+    <Modal
+      label="Request a set"
+      icon={null}
+      title="Request a set"
+      size="sm"
+      trigger={(open) => (
+        <button
+          type="button"
+          onClick={open}
+          className="w-full rounded-xl btn-brand px-4 py-3 text-sm font-semibold text-white"
+        >
+          + Request a set
+        </button>
+      )}
+    >
+      {(close) => (
+        <RequestSetForm
+          code={code}
+          supabase={supabase}
+          onSent={() => {
+            close();
+            onSent();
+          }}
+        />
+      )}
+    </Modal>
+  );
+}
+
+function RequestSetForm({
+  code,
+  supabase,
+  onSent,
+}: {
+  code: string;
+  supabase: SupabaseBrowserClient;
+  onSent: () => void;
+}) {
+  const [roster, setRoster] = useState<RosterPlayer[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [requestedByName, setRequestedByName] = useState("");
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitting, startSubmitting] = useTransition();
+
+  useEffect(() => {
+    let cancelled = false;
+    supabase
+      .rpc("get_roster_by_code", { code })
+      .then(({ data, error }: { data: { player_id: string; player_name: string }[] | null; error: { message: string } | null }) => {
+        if (cancelled) return;
+        if (error) {
+          setLoadError(error.message);
+          return;
+        }
+        setRoster((data ?? []).map((r) => ({ id: r.player_id, name: r.player_name })));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [code, supabase]);
+
+  function toggle(playerId: string) {
+    setSelected((prev) => {
+      if (prev.includes(playerId)) return prev.filter((id) => id !== playerId);
+      if (prev.length >= 4) return prev;
+      return [...prev, playerId];
+    });
+  }
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setSubmitError(null);
+    if (selected.length === 0) {
+      setSubmitError("Pick at least one player.");
+      return;
+    }
+    startSubmitting(async () => {
+      const { error } = await supabase.rpc("request_game", {
+        code,
+        player_ids: selected,
+        requested_by: requestedByName.trim() || null,
+      });
+      if (error) {
+        setSubmitError(error.message);
+        return;
+      }
+      onSent();
+    });
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <p className="text-xs text-black/50">
+        Pick up to 4 players — 1st &amp; 2nd play together, then 3rd &amp; 4th. The queue master reviews it
+        before it&apos;s added.
+      </p>
+
+      {loadError ? (
+        <p className="text-sm text-red-600">{loadError}</p>
+      ) : roster === null ? (
+        <p className="text-sm text-black/40">Loading players…</p>
+      ) : roster.length === 0 ? (
+        <p className="text-sm text-black/40">No players registered for this session yet.</p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {roster.map((p) => {
+            const checked = selected.includes(p.id);
+            const disabled = !checked && selected.length >= 4;
+            const pickNumber = selected.indexOf(p.id) + 1;
+            return (
+              <label key={p.id}>
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  disabled={disabled}
+                  onChange={() => toggle(p.id)}
+                  className="peer sr-only"
+                />
+                <span
+                  className={`flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-sm font-medium transition-colors ${
+                    checked
+                      ? "cursor-pointer border-transparent bg-brand text-white shadow-sm shadow-brand/30"
+                      : disabled
+                        ? "cursor-not-allowed border-black/10 bg-black/[0.03] text-black/30"
+                        : "cursor-pointer border-black/15 text-black/70 hover:border-brand/40"
+                  }`}
+                >
+                  {checked && (
+                    <span className="flex h-4 w-4 flex-none items-center justify-center rounded-full bg-white/25 text-[10px] font-bold">
+                      {pickNumber}
+                    </span>
+                  )}
+                  {p.name}
+                </span>
+              </label>
+            );
+          })}
+        </div>
+      )}
+
+      {selected.length > 0 && roster && (
+        <div className="rounded-lg bg-black/[0.03] px-3 py-2.5">
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-black/40">Matchup</p>
+          <Matchup
+            team1={selected.slice(0, 2).map((id) => roster.find((p) => p.id === id)?.name)}
+            team2={selected.slice(2, 4).map((id) => roster.find((p) => p.id === id)?.name)}
+          />
+        </div>
+      )}
+
+      <div>
+        <label className="mb-1 block text-sm font-medium text-brand">Your name (optional)</label>
+        <input
+          type="text"
+          value={requestedByName}
+          onChange={(e) => setRequestedByName(e.target.value)}
+          placeholder="So the queue master knows who asked"
+          className="w-full rounded-xl border border-black/15 px-3 py-2 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+        />
+      </div>
+
+      {submitError && <p className="text-sm text-red-600">{submitError}</p>}
+
+      <button
+        type="submit"
+        disabled={isSubmitting || selected.length === 0}
+        className="w-full rounded-xl btn-brand px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
+      >
+        {isSubmitting ? "Sending…" : "Send request"}
+      </button>
+    </form>
   );
 }
 

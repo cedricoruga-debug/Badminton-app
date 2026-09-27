@@ -10,7 +10,8 @@ import type { Game, PlayerSessionWithPlayer } from "@/lib/types";
 
 type SessionOption = { id: string; session_date: string };
 
-const STATUSES: Array<{ value: "Queued" | "Ongoing" | "Done"; label: string }> = [
+const STATUSES: Array<{ value: "Requested" | "Queued" | "Ongoing" | "Done"; label: string }> = [
+  { value: "Requested", label: "Requested" },
   { value: "Queued", label: "New" },
   { value: "Ongoing", label: "Ongoing" },
   { value: "Done", label: "Done" },
@@ -207,6 +208,7 @@ export function GameFormFields({
   defaultWinnerTeam = null,
   defaultScore1 = null,
   defaultScore2 = null,
+  defaultRequestedBy = null,
   submitLabel = "Save",
   redirectTo,
   close,
@@ -242,7 +244,7 @@ export function GameFormFields({
    * currently playing. Optional; with none given (or omitted) everyone just
    * shows as free. */
   games?: GameForStatus[];
-  defaultStatus?: "Queued" | "Ongoing" | "Done";
+  defaultStatus?: "Requested" | "Queued" | "Ongoing" | "Done";
   /** Four raw slots (player1..player4), null where empty — not compacted.
    * Slot position is what decides teams (0&1 = team1, 2&3 = team2), so a
    * gap has to stay a gap rather than sliding the next pick up into it. */
@@ -252,6 +254,10 @@ export function GameFormFields({
   defaultWinnerTeam?: "team1" | "team2" | null;
   defaultScore1?: number | null;
   defaultScore2?: number | null;
+  /** Who requested this game via the public /join "Request a set" form —
+   * shown as a read-only note (never editable here). Null/omitted for a
+   * game the queue master logged themselves. */
+  defaultRequestedBy?: string | null;
   submitLabel?: string;
   /** Where `action` should redirect after saving (create only — "/" by
    * default). Lets a page like Games keep you on itself after adding one. */
@@ -397,6 +403,12 @@ export function GameFormFields({
         </div>
       ) : (
         <input type="hidden" name="session_id" value={defaultSessionId} />
+      )}
+
+      {defaultRequestedBy && (
+        <p className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-800">
+          Requested by <span className="font-semibold">{defaultRequestedBy}</span> via the queue page.
+        </p>
       )}
 
       <fieldset>

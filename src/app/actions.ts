@@ -107,12 +107,15 @@ export async function toggleGameStatus(gameId: string, currentStatus: string) {
 }
 
 const STATUS_FORWARD: Record<string, "Queued" | "Ongoing" | "Done"> = {
+  Requested: "Queued",
   Queued: "Ongoing",
   Ongoing: "Done",
   Done: "Done",
 };
 
-/** Move a game one step forward: Queued -> Ongoing -> Done (the "Move forward" button). */
+/** Move a game one step forward: Requested -> Queued -> Ongoing -> Done (the
+ * "Move forward" button — doubles as the "Approve" action on a Requested
+ * game, since approving one is exactly "move it to Queued"). */
 export async function advanceGameStatus(gameId: string, currentStatus: string) {
   const supabase = await createClient();
   const nextStatus = STATUS_FORWARD[currentStatus] ?? "Queued";
@@ -630,9 +633,9 @@ export async function deleteSession(sessionId: string) {
   redirect("/sessions");
 }
 
-function parseGameStatus(value: FormDataEntryValue | null): "Queued" | "Ongoing" | "Done" {
+function parseGameStatus(value: FormDataEntryValue | null): "Requested" | "Queued" | "Ongoing" | "Done" {
   const s = String(value);
-  return s === "Ongoing" || s === "Done" ? s : "Queued";
+  return s === "Requested" || s === "Ongoing" || s === "Done" ? s : "Queued";
 }
 
 function parseWinnerTeam(value: FormDataEntryValue | null): "team1" | "team2" | null {

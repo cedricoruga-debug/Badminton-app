@@ -13,6 +13,7 @@ type SessionOption = { id: string; session_date: string };
 type GameForStatus = Pick<Game, "id" | "game_number" | "status" | "player1_id" | "player2_id" | "player3_id" | "player4_id">;
 
 const STATUS_STYLES: Record<string, string> = {
+  Requested: "bg-violet-100 text-violet-800",
   Queued: "bg-brand-light text-brand",
   Ongoing: "bg-amber-100 text-amber-800",
   Done: "bg-green-100 text-green-800",
@@ -73,6 +74,9 @@ export function GameRow({
                     ` (${game.score1 ?? "–"}-${game.score2 ?? "–"})`}
                 </p>
               )}
+              {game.status === "Requested" && game.requested_by && (
+                <p className="mt-0.5 text-xs text-violet-700">Requested by {game.requested_by}</p>
+              )}
             </div>
 
             <div className="flex flex-none items-center gap-2">
@@ -88,7 +92,13 @@ export function GameRow({
                   <button
                     type="button"
                     disabled={isPending}
-                    title={game.status === "Queued" ? "Start this game" : "Mark this game done"}
+                    title={
+                      game.status === "Requested"
+                        ? "Approve this request"
+                        : game.status === "Queued"
+                          ? "Start this game"
+                          : "Mark this game done"
+                    }
                     onClick={(e) => {
                       e.stopPropagation();
                       startTransition(() => queueableAdvanceGameStatus(isOnline, game.id, game.status));
@@ -98,7 +108,11 @@ export function GameRow({
                     {/* Says what tapping it actually does next, instead of
                      * the generic "Move forward" — same wording style as
                      * the court boxes' "Ongoing — mark done" button. */}
-                    {game.status === "Queued" ? "Start game →" : "Mark done ✓"}
+                    {game.status === "Requested"
+                      ? "Approve ✓"
+                      : game.status === "Queued"
+                        ? "Start game →"
+                        : "Mark done ✓"}
                   </button>
                 )}
               </div>
