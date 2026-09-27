@@ -14,6 +14,52 @@ const GAME_STATUS_STYLES: Record<string, string> = {
 };
 
 /**
+ * This player's Done-game set record: wins (on the winning pair), splits (a
+ * Done game with no winner recorded — each team took a set, so it's a real
+ * result, just not a clean one), and losses. Win rate mirrors the
+ * dashboard's MVP formula (see DashboardClient) so the number means the
+ * same thing everywhere it shows up: 2 points for a win, 1 for a split, 0
+ * for a loss, over the max possible (2 per set played).
+ */
+function winSetStats(games: GameWithPlayers[], playerId: string) {
+  const doneGames = games.filter(
+    (g) =>
+      g.status === "Done" &&
+      [g.player1_id, g.player2_id, g.player3_id, g.player4_id].includes(playerId)
+  );
+  let wins = 0;
+  let splits = 0;
+  for (const g of doneGames) {
+    if (!g.winner_team) {
+      splits++;
+      continue;
+    }
+    const winners = g.winner_team === "team1" ? [g.player1_id, g.player2_id] : [g.player3_id, g.player4_id];
+    if (winners.includes(playerId)) wins++;
+  }
+  const played = doneGames.length;
+  const losses = played - wins - splits;
+  const rate = played > 0 ? (wins * 2 + splits) / (played * 2) : null;
+  return { wins, splits, losses, played, rate };
+}
+
+/** Slim segmented bar — wins (emerald), splits (amber), losses (a faint
+ * outline, not a "bad" color; a Done game with no winner recorded and a
+ * clean loss are different things, but neither is failure) — proportional
+ * to how many Done sets make up each. Renders nothing when nothing's been
+ * played yet (no bar is more honest than an empty/grey one). */
+function SetRecordBar({ wins, splits, losses, played }: { wins: number; splits: number; losses: number; played: number }) {
+  if (played === 0) return null;
+  return (
+    <div className="flex h-1.5 flex-1 overflow-hidden rounded-full bg-black/5">
+      {wins > 0 && <span style={{ width: `${(wins / played) * 100}%` }} className="bg-emerald-500" />}
+      {splits > 0 && <span style={{ width: `${(splits / played) * 100}%` }} className="bg-amber-400" />}
+      {losses > 0 && <span style={{ width: `${(losses / played) * 100}%` }} className="bg-black/15" />}
+    </div>
+  );
+}
+
+/**
  * A player's row for a session — clickable to open a popup with their full
  * details: games played, payment status and actions, and the list of games
  * they've actually played (Ongoing/Done, same set the game-count/payable
@@ -44,10 +90,12 @@ export function PlayerSessionRow({
   const playedGames = games
     .filter(
       (g) =>
-        g.status !== "Queued" &&
+        (g.status === "Ongoing" || g.status === "Done") &&
         [g.player1_id, g.player2_id, g.player3_id, g.player4_id].includes(ps.player_id)
     )
     .sort((a, b) => a.game_number - b.game_number);
+
+  const setStats = winSetStats(games, ps.player_id);
 
   return (
     <li className="border-b border-black/10 last:border-b-0">
@@ -167,6 +215,18 @@ export function PlayerSessionRow({
                  * below. */}
               </div>
             </div>
+
+            {/* Set record — only once there's at least one Done game, so a
+             * player who hasn't played yet doesn't carry an empty bar
+             * around. Same win-rate math as the dashboard's Today's MVP. */}
+            {setStats.played > 0 && (
+              <div className="flex items-center gap-2">
+                <SetRecordBar {...setStats} />
+                <span className="flex-none text-[10px] font-medium text-black/40">
+                  {Math.round((setStats.rate ?? 0) * 100)}%
+                </span>
+              </div>
+            )}
           </div>
         )}
       >
@@ -182,6 +242,42 @@ export function PlayerSessionRow({
                 <dd className="text-base font-semibold">₱{ps.payable.toFixed(2)}</dd>
               </div>
             </dl>
+
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wide text-black/40">Set record</p>
+                {setStats.played > 0 && (
+                  <span className="text-sm font-semibold text-brand">
+                    {Math.round((setStats.rate ?? 0) * 100)}% win rate
+                  </span>
+                )}
+              </div>
+              {setStats.played === 0 ? (
+                <p className="text-sm text-black/40">No sets played yet.</p>
+              ) : (
+                <>
+                  <div className="mb-2">
+                    <SetRecordBar {...setStats} />
+                  </div>
+                  <p className="text-xs text-black/50">
+                    <span className="font-medium text-emerald-700">{setStats.wins} won</span>
+                    {setStats.splits > 0 && (
+                      <>
+                        {" · "}
+                        <span className="font-medium text-amber-700">{setStats.splits} split</span>
+                      </>
+                    )}
+                    {setStats.losses > 0 && (
+                      <>
+                        {" · "}
+                        <span className="font-medium text-black/40">{setStats.losses} lost</span>
+                      </>
+                    )}
+                    {` of ${setStats.played} sets`}
+                  </p>
+                </>
+              )}
+            </div>
 
             <div>
               <div className="mb-2 flex items-center justify-between">
