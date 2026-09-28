@@ -12,12 +12,11 @@
   --color-brand-dark: #234036; /* Soft Forest */
   --color-brand-light: #eaf8ef; /* Mint Wash */
 
-  /* Secondary accent (soft forest) — pairs with the rally-green brand color
-   * for a bit more depth wherever a single flat green starts to feel
-   * monotonous (the header, active nav state, gradient buttons). Not used
-   * for status colors (those stay green/amber/red, set independently at
-   * each call site) so it never competes with "Done"/"Ongoing"/"delete"
-   * meanings. */
+  /* Secondary accent (soft forest) — a darker shade of the brand color for
+   * hover/active states (buttons, nav) wherever a single flat green needs
+   * more contrast. Not used for status colors (those stay green/amber/red,
+   * set independently at each call site) so it never competes with
+   * "Done"/"Ongoing"/"delete" meanings. */
   --color-accent: #234036; /* Soft Forest */
   --color-accent-dark: #172a23;
   --color-accent-light: #eaf8ef; /* Mint Wash */
@@ -28,10 +27,7 @@
 }
 
 body {
-  /* A faint radial lift instead of a flat fill — subtle, not a visible
-   * "gradient", just keeps the page from reading as a single dead green
-   * rectangle behind the cards. */
-  background: radial-gradient(circle at 50% 0%, #f4fbf7 0%, var(--background) 60%);
+  background: var(--background);
   color: var(--foreground);
 }
 
@@ -58,21 +54,21 @@ body {
 }
 
 /**
- * Primary "brand" action button — every Save/Add/Create button in the app
- * used a flat `bg-brand` fill with a `hover:bg-brand-dark` swap. This gives
- * them a soft gradient, a brand-tinted glow, and a gentle hover brighten
- * instead, without having to touch each button's padding/rounding/text
- * classes. Usage: keep the existing layout classes, swap `bg-brand` for
- * `btn-brand` and drop the `hover:bg-brand-dark` (this class replaces both).
+ * Primary "brand" action button — every Save/Add/Create button in the app.
+ * A flat `bg-brand` fill with a `hover:bg-brand-dark` swap, plus a
+ * brand-tinted glow, without having to touch each button's
+ * padding/rounding/text classes. Usage: keep the existing layout classes,
+ * swap `bg-brand` for `btn-brand` and drop the `hover:bg-brand-dark` (this
+ * class replaces both).
  */
 .btn-brand {
-  background-image: linear-gradient(135deg, var(--color-brand), var(--color-brand-dark));
+  background-color: var(--color-brand);
   color: #fff;
   box-shadow: 0 3px 10px -2px rgba(35, 64, 54, 0.35);
-  transition: filter 150ms ease, box-shadow 150ms ease;
+  transition: background-color 150ms ease, box-shadow 150ms ease;
 }
 .btn-brand:hover:not(:disabled) {
-  filter: brightness(1.08);
+  background-color: var(--color-brand-dark);
   box-shadow: 0 6px 16px -3px rgba(35, 64, 54, 0.45);
 }
 .btn-brand:disabled {

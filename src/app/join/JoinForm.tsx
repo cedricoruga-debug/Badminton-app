@@ -218,7 +218,7 @@ export function JoinForm({ initialCode = "" }: { initialCode?: string }) {
  * (submitted via RequestSetButton below, pending the queue master's
  * approval). Built mobile-first — this is the page most players actually
  * open, usually on their phone while standing courtside — with a branded
- * gradient header (same gradient as the main app's, so a scanning player
+ * header (same brand fill as the main app's, so a scanning player
  * recognizes it as part of the same thing) rather than the plain
  * utility-page look the code entry screen still uses.
  */
@@ -244,9 +244,9 @@ function QueueView({
 
   return (
     <div className="min-h-screen bg-black/[0.02] pb-[max(1.5rem,env(safe-area-inset-bottom))]">
-      {/* Hero header, full-bleed — matches the main app's header gradient so
+      {/* Hero header, full-bleed — matches the main app's header fill so
        * this reads as the same product, not a bare fallback page. */}
-      <div className="bg-gradient-to-r from-brand to-accent px-4 pb-9 pt-[max(1.25rem,env(safe-area-inset-top))] text-white shadow-[0_2px_14px_rgba(54,201,143,0.3)]">
+      <div className="bg-brand px-4 pb-9 pt-[max(1.25rem,env(safe-area-inset-top))] text-white shadow-[0_2px_14px_rgba(54,201,143,0.3)]">
         <div className="mx-auto flex w-full max-w-sm items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2.5">
             <span className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-white/15">
