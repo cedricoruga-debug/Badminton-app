@@ -31,7 +31,7 @@ export const metadata: Metadata = {
 // A separate export from `metadata` above — Next.js splits viewport-related
 // tags (theme-color included) out on purpose, see generate-viewport docs.
 export const viewport: Viewport = {
-  themeColor: "#78947a",
+  themeColor: "#36c98f",
 };
 
 /** Whether the signed-in visitor is an admin — decides whether the nav
