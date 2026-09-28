@@ -25,9 +25,19 @@ const COALESCE_MS = 400;
 const MIN_MS_BETWEEN_REFOCUS_REFRESH = 5000;
 
 /**
+ * How often the poll fallback below rechecks while the tab is open and
+ * visible. Short enough that "someone requested a set and the queue master
+ * is staring at the screen waiting" never turns into an actual wait, long
+ * enough not to hammer the server when Realtime is doing its job fine (the
+ * common case) — this only ever does real work when Realtime hasn't
+ * already refreshed more recently than this.
+ */
+const POLL_MS = 8000;
+
+/**
  * Keeps the current page's data in sync with everyone else's — the whole
  * reason this exists is "I deleted something on my phone and my laptop
- * didn't notice." Three mechanisms, layered:
+ * didn't notice." Four mechanisms, layered:
  *
  * 1. Supabase Realtime: subscribes to every table the app reads from and
  *    re-fetches the page the moment any row changes, anywhere — including
@@ -48,6 +58,17 @@ const MIN_MS_BETWEEN_REFOCUS_REFRESH = 5000;
  *    websockets, so Realtime's socket can be dead by the time you switch
  *    back. Refreshing on refocus catches anything missed while the socket
  *    was down, regardless of whether Realtime is configured at all.
+ * 4. Poll fallback: a court-side connection can be flaky enough that the
+ *    websocket goes quietly dead — not a clean disconnect that would fire
+ *    #2's reconnect, not backgrounded so #3 never refocuses — and just
+ *    stops delivering events while everything still *looks* connected.
+ *    That's exactly the "someone requests a set and the queue master is
+ *    already looking at the screen, but it takes forever to show up" case.
+ *    This is the backstop for it: while the tab is open and visible, just
+ *    recheck every POLL_MS regardless of what Realtime is doing. Skipped
+ *    whenever a refresh already happened within the last POLL_MS (from
+ *    Realtime or otherwise), so it costs nothing beyond an idle timer on
+ *    the common path where Realtime is working fine.
  */
 function useLiveRefresh(enabled: boolean) {
   const router = useRouter();
@@ -94,8 +115,15 @@ function useLiveRefresh(enabled: boolean) {
     document.addEventListener("visibilitychange", onRefocus);
     window.addEventListener("focus", onRefocus);
 
+    const pollTimer = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      if (Date.now() - lastRefresh.current < POLL_MS) return;
+      refreshNow();
+    }, POLL_MS);
+
     return () => {
       if (coalesceTimer) clearTimeout(coalesceTimer);
+      clearInterval(pollTimer);
       document.removeEventListener("visibilitychange", onRefocus);
       window.removeEventListener("focus", onRefocus);
       supabase.removeChannel(channel);
