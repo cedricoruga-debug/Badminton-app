@@ -24,7 +24,7 @@
 
   /* Self-hosted via @fontsource (imported in layout.tsx) — falls back to
    * the system stack if it somehow fails to load. */
-  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Nunito", ui-sans-serif, system-ui, sans-serif;
 }
 
 body {
