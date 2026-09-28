@@ -301,15 +301,7 @@ export function DashboardClient({ seed }: { seed: DashboardSeed }) {
             ) : unpaid.length === 0 ? (
               <li className="py-4 text-sm text-black/50">Everyone&apos;s paid.</li>
             ) : (
-              unpaid.map((ps) => (
-                <PlayerSessionRow
-                  key={ps.id}
-                  ps={ps}
-                  games={games}
-                  sessionDiscountTotal={session?.discount_total ?? 0}
-                  sessionPlayerCount={session?.player_count ?? 0}
-                />
-              ))
+              unpaid.map((ps) => <PlayerSessionRow key={ps.id} ps={ps} games={games} />)
             )}
           </ul>
         </section>

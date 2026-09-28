@@ -21,11 +21,6 @@ export type Session = {
   shuttle_fee_per_game: number;
   player_count: number;
   court_share_per_player: number;
-  /** Flat peso amount, entered once for the whole session, split evenly
-   * across every registered player by recomputing each one's
-   * discount_percent (see recomputePlayerGameCounts). 0 = no session-wide
-   * discount — per-player discount_percent is then set manually instead. */
-  discount_total: number;
   created_at: string;
 };
 
@@ -62,6 +57,11 @@ export type PlayerSession = {
   /** Percent off the court+shuttle cost (before the flat +10 buffer),
    * queue-master-set per player per session. 0 = no discount. */
   discount_percent: number;
+  /** Server-managed, not directly editable: this player's even share of
+   * covering everyone else's discount_percent this session, in pesos —
+   * always 0 for a player who has a discount of their own. See
+   * recomputePlayerGameCounts in src/app/actions.ts. */
+  surcharge_amount: number;
   payable: number;
   payment_method: "Cash" | "Gcash" | null;
   done_for_session: boolean;

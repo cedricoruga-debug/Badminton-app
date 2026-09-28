@@ -68,17 +68,6 @@ create table if not exists sessions (
     case when player_count = 0 then 0 else (hours * fee_per_hour) / player_count end
   ) stored,
 
-  -- Flat peso amount the queue master enters ONCE for the whole session
-  -- (e.g. a sponsor covering part of the cost) — split evenly across every
-  -- registered player_sessions row for this session by converting it into
-  -- each player's discount_percent, recomputed alongside total_games/
-  -- court_share/shuttle_share every time recomputePlayerGameCounts runs
-  -- (see src/app/actions.ts), so the equal split stays true as games are
-  -- logged or the session's cost inputs change. 0 = no session-wide
-  -- discount; the per-player discount_percent field on player_sessions is
-  -- then left exactly as the queue master set it, unmanaged by this.
-  discount_total numeric(10, 2) not null default 0 check (discount_total >= 0),
-
   created_at timestamptz not null default now()
 );
 
@@ -86,11 +75,6 @@ create table if not exists sessions (
 alter table sessions add column if not exists join_code text;
 alter table sessions drop constraint if exists sessions_join_code_key;
 alter table sessions add constraint sessions_join_code_key unique (join_code);
-
--- safe to re-run against a database created before discount_total existed
-alter table sessions add column if not exists discount_total numeric(10, 2) not null default 0;
-alter table sessions drop constraint if exists sessions_discount_total_check;
-alter table sessions add constraint sessions_discount_total_check check (discount_total >= 0);
 
 -- ---------------------------------------------------------------------------
 -- games   (was: AppSheet "Games" table)
@@ -154,9 +138,15 @@ create table if not exists player_sessions (
   -- whoever brings the shuttles) — a percentage off the court+shuttle cost
   -- before the flat +10 buffer below, not off the final payable amount.
   discount_percent numeric(5, 2) not null default 0 check (discount_percent >= 0 and discount_percent <= 100),
+  -- Server-managed (recomputePlayerGameCounts in src/app/actions.ts), not
+  -- directly editable: this player's even share of covering everyone
+  -- else's discount_percent this session, in pesos, added on top of their
+  -- own court+shuttle cost. Always 0 for a player who has a discount of
+  -- their own — the cost only spreads across players without one.
+  surcharge_amount numeric(10, 2) not null default 0 check (surcharge_amount >= 0),
   payable numeric(10, 2) generated always as (
-    case when (court_share + shuttle_share) = 0 then 0
-         else ceil((court_share + shuttle_share) * (1 - discount_percent / 100.0) / 10.0) * 10 + 10
+    case when (court_share + shuttle_share + surcharge_amount) = 0 then 0
+         else ceil(((court_share + shuttle_share) * (1 - discount_percent / 100.0) + surcharge_amount) / 10.0) * 10 + 10
     end
   ) stored,
   -- null = unpaid; otherwise the method used
@@ -178,10 +168,16 @@ alter table player_sessions add column if not exists done_for_session boolean no
 -- the recomputed value is identical to what's already stored.
 alter table player_sessions add column if not exists discount_percent numeric(5, 2) not null default 0
   check (discount_percent >= 0 and discount_percent <= 100);
+
+-- safe to re-run against a database created before surcharge_amount existed
+alter table player_sessions add column if not exists surcharge_amount numeric(10, 2) not null default 0;
+alter table player_sessions drop constraint if exists player_sessions_surcharge_amount_check;
+alter table player_sessions add constraint player_sessions_surcharge_amount_check check (surcharge_amount >= 0);
+
 alter table player_sessions drop column if exists payable;
 alter table player_sessions add column payable numeric(10, 2) generated always as (
-  case when (court_share + shuttle_share) = 0 then 0
-       else ceil((court_share + shuttle_share) * (1 - discount_percent / 100.0) / 10.0) * 10 + 10
+  case when (court_share + shuttle_share + surcharge_amount) = 0 then 0
+       else ceil(((court_share + shuttle_share) * (1 - discount_percent / 100.0) + surcharge_amount) / 10.0) * 10 + 10
   end
 ) stored;
 

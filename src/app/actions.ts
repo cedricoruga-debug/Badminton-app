@@ -23,14 +23,19 @@ import { createClient } from "@/lib/supabase/server";
  * mirroring the original sheet's =CEILING(E+F+10, 10) rounding, since
  * ceil((court_share + shuttle_share) / 10) * 10 + 10 is the same formula.
  *
- * Also re-derives every player's discount_percent from the session's
- * discount_total (see schema.sql) whenever one is set, so the queue
- * master's single "split this evenly" peso amount stays an equal split as
- * court_share/shuttle_share move — a plain percentage can't do that on its
- * own since shuttle_share differs per player by games played. When
- * discount_total is 0 (the default — no session-wide discount in use),
- * each player's discount_percent is left exactly as-is, so the older
- * per-player "Add discount" flow keeps working unaffected.
+ * Also re-derives every player's surcharge_amount: whenever a player has a
+ * discount_percent set (the existing per-player "Add discount" editor —
+ * see setPlayerDiscount/PlayerSessionRow), the peso amount that saves them
+ * — discount_percent% of THEIR OWN court_share + shuttle_share — is pooled
+ * and split evenly across every OTHER player in the session who doesn't
+ * have a discount of their own, so the session still collects the same
+ * total. That's folded into payable (see schema.sql) as a flat peso
+ * add-on rather than a second percentage, since players without a
+ * discount can have different shuttle_share amounts (different games
+ * played) — an equal peso add-on is what actually keeps their share of
+ * covering the discount even, a percentage wouldn't. Recomputed here
+ * (rather than only inside setPlayerDiscount) so it stays right as games
+ * are logged or a session's cost inputs change, same as total_games.
  */
 async function recomputePlayerGameCounts(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -52,7 +57,7 @@ async function recomputePlayerGameCounts(
       .in("status", ["Ongoing", "Done"]),
     supabase
       .from("sessions")
-      .select("court_share_per_player, shuttle_fee_per_game, discount_total")
+      .select("court_share_per_player, shuttle_fee_per_game")
       .eq("id", sessionId)
       .single(),
     supabase.from("player_sessions").select("id, player_id, discount_percent").eq("session_id", sessionId),
@@ -70,9 +75,23 @@ async function recomputePlayerGameCounts(
 
   const courtSharePerPlayer = session.court_share_per_player;
   const shuttleFeePerGame = session.shuttle_fee_per_game;
-  const discountTotal = session.discount_total ?? 0;
-  const payerCount = (playerSessions ?? []).length;
-  const equalShare = payerCount > 0 ? discountTotal / payerCount : 0;
+
+  // Pass 1: fresh total_games/court_share/shuttle_share per player, plus
+  // how much pesos their own discount_percent (if any) saves them.
+  const shares = (playerSessions ?? []).map((ps) => {
+    const totalGames = counts.get(ps.player_id) ?? 0;
+    const courtShare = courtSharePerPlayer;
+    const shuttleShare = totalGames * shuttleFeePerGame;
+    const savedAmount = ps.discount_percent > 0 ? ((courtShare + shuttleShare) * ps.discount_percent) / 100 : 0;
+    return { ps, totalGames, courtShare, shuttleShare, savedAmount };
+  });
+
+  // Pass 2: pool everyone's savings and split it evenly across whoever has
+  // no discount of their own. No one to split it across (everyone has a
+  // discount, or no one does) just means no surcharge.
+  const totalSaved = shares.reduce((sum, s) => sum + s.savedAmount, 0);
+  const nonDiscountedCount = shares.filter((s) => s.ps.discount_percent === 0).length;
+  const perPlayerSurcharge = nonDiscountedCount > 0 ? totalSaved / nonDiscountedCount : 0;
 
   // One request updating every player_session row at once, instead of one
   // request per player (this function runs after every game
@@ -82,28 +101,17 @@ async function recomputePlayerGameCounts(
   // getting updated (session_id/player_id are unchanged — same values the
   // row already has — but ON CONFLICT DO UPDATE still validates the
   // candidate row before it realizes there's a conflict to resolve).
-  if ((playerSessions ?? []).length > 0) {
-    const rows = playerSessions!.map((ps) => {
-      const totalGames = counts.get(ps.player_id) ?? 0;
-      const courtShare = courtSharePerPlayer;
-      const shuttleShare = totalGames * shuttleFeePerGame;
-      const base = courtShare + shuttleShare;
-      // discountTotal === 0 means the session isn't using the equal-split
-      // feature, so this player's discount_percent is passed through
-      // unchanged rather than forced to 0 — that would silently wipe out a
-      // discount the queue master set by hand on the player themselves.
-      const discountPercent =
-        discountTotal > 0 ? (base > 0 ? Math.min(100, Math.round((equalShare / base) * 10000) / 100) : 0) : ps.discount_percent;
-      return {
-        id: ps.id,
-        session_id: sessionId,
-        player_id: ps.player_id,
-        total_games: totalGames,
-        court_share: courtShare,
-        shuttle_share: shuttleShare,
-        discount_percent: discountPercent,
-      };
-    });
+  if (shares.length > 0) {
+    const rows = shares.map(({ ps, totalGames, courtShare, shuttleShare }) => ({
+      id: ps.id,
+      session_id: sessionId,
+      player_id: ps.player_id,
+      total_games: totalGames,
+      court_share: courtShare,
+      shuttle_share: shuttleShare,
+      discount_percent: ps.discount_percent,
+      surcharge_amount: ps.discount_percent === 0 ? Math.round(perPlayerSurcharge * 100) / 100 : 0,
+    }));
     const { error } = await supabase.from("player_sessions").upsert(rows, { onConflict: "id" });
     if (error) throw new Error(error.message);
   }
@@ -449,11 +457,24 @@ export async function setPlayerDiscount(playerSessionId: string, discountPercent
   const clamped = Math.min(100, Math.max(0, Math.round(discountPercent)));
 
   const supabase = await createClient();
+  const { data: ps, error: fetchError } = await supabase
+    .from("player_sessions")
+    .select("session_id")
+    .eq("id", playerSessionId)
+    .single();
+  if (fetchError) throw new Error(fetchError.message);
+
   const { error } = await supabase
     .from("player_sessions")
     .update({ discount_percent: clamped })
     .eq("id", playerSessionId);
   if (error) throw new Error(error.message);
+
+  // This player's discount changes how much everyone else without a
+  // discount owes too (see recomputePlayerGameCounts's doc comment) — so
+  // the whole session's surcharge split needs to be redone, not just this
+  // one row.
+  await recomputePlayerGameCounts(supabase, ps.session_id);
 
   revalidatePath("/");
   revalidatePath("/sessions");
@@ -611,7 +632,6 @@ export async function updateSession(formData: FormData) {
   const hours = Number(formData.get("hours") ?? 0) || 0;
   const feePerHour = Number(formData.get("fee_per_hour") ?? 0) || 0;
   const shuttleTubeCost = Number(formData.get("shuttle_tube_cost") ?? 0) || 0;
-  const discountTotal = Math.max(0, Number(formData.get("discount_total") ?? 0) || 0);
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -620,7 +640,6 @@ export async function updateSession(formData: FormData) {
       hours,
       fee_per_hour: feePerHour,
       shuttle_tube_cost: shuttleTubeCost,
-      discount_total: discountTotal,
     })
     .eq("id", sessionId);
 
@@ -631,8 +650,9 @@ export async function updateSession(formData: FormData) {
   // but each player's stored court_share/shuttle_share — and so their
   // generated `payable` — don't follow along on their own. Without this,
   // editing a session's cost inputs silently leaves everyone's amount due
-  // stuck at whatever it was before the edit. This also re-splits
-  // discount_total evenly across every player (see its doc comment above).
+  // stuck at whatever it was before the edit. This also re-splits any
+  // player discounts' cost across the rest of the roster (see
+  // recomputePlayerGameCounts's doc comment above).
   await recomputePlayerGameCounts(supabase, sessionId);
 
   revalidatePath("/");

@@ -79,6 +79,7 @@ function toBarePlayerSession(ps: PlayerSessionWithPlayer): PlayerSession {
     court_share: ps.court_share,
     shuttle_share: ps.shuttle_share,
     discount_percent: ps.discount_percent,
+    surcharge_amount: ps.surcharge_amount,
     payable: ps.payable,
     payment_method: ps.payment_method,
     done_for_session: ps.done_for_session,

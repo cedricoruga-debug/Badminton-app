@@ -143,15 +143,7 @@ export default async function SessionsPage(props: PageProps<"/sessions">) {
                 {selectedPlayers.length === 0 ? (
                   <li className="py-4 text-sm text-black/50">No players registered for this date.</li>
                 ) : (
-                  selectedPlayers.map((ps) => (
-                    <PlayerSessionRow
-                      key={ps.id}
-                      ps={ps}
-                      games={selectedGames}
-                      sessionDiscountTotal={selectedSession?.discount_total ?? 0}
-                      sessionPlayerCount={selectedSession?.player_count ?? 0}
-                    />
-                  ))
+                  selectedPlayers.map((ps) => <PlayerSessionRow key={ps.id} ps={ps} games={selectedGames} />)
                 )}
               </ul>
             </div>
