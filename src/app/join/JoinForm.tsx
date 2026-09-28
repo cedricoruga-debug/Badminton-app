@@ -58,6 +58,33 @@ function saveRequestedByName(name: string) {
   }
 }
 
+/**
+ * An opaque per-device id, generated once and kept in localStorage — not
+ * tied to a name (players don't always bother typing one) or any real
+ * identity, just this browser. Sent along with every "Request a set" and
+ * echoed back by get_queue_by_code (see schema.sql) so this device's own
+ * pending request is the only one the "Requested" section below shows —
+ * without it, everyone checking the queue would see everyone else's
+ * pending requests too, not just their own.
+ */
+const REQUESTER_TOKEN_STORAGE_KEY = "badminton-requester-token";
+
+function getRequesterToken(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const existing = window.localStorage.getItem(REQUESTER_TOKEN_STORAGE_KEY);
+    if (existing) return existing;
+    const fresh =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    window.localStorage.setItem(REQUESTER_TOKEN_STORAGE_KEY, fresh);
+    return fresh;
+  } catch {
+    return null; // storage blocked/unavailable — just means this device won't see its own request in the list
+  }
+}
+
 /** How often to silently re-fetch the queue while this page is open — often
  * enough that "who's next" stays useful, not so often it's hammering the
  * database for what's really just a handful of concurrent viewers at most. */
@@ -107,7 +134,10 @@ export function JoinForm({ initialCode = "" }: { initialCode?: string }) {
         return;
       }
 
-      const { data: rows, error: queueError } = await supabase.rpc("get_queue_by_code", { code: c });
+      const { data: rows, error: queueError } = await supabase.rpc("get_queue_by_code", {
+        code: c,
+        viewer_token: getRequesterToken(),
+      });
       if (queueError) {
         if (!opts.silent) setError(queueError.message);
         return;
@@ -337,7 +367,10 @@ function QueueView({
           )}
         </section>
 
-        {/* Requested sets — only shown once there's at least one, so a
+        {/* This device's own pending request(s) — scoped server-side by
+         * requester_token (see get_queue_by_code in schema.sql), so this
+         * never shows anyone else's pending requests, only what was
+         * submitted from here. Only shown once there's at least one, so a
          * session with nothing pending doesn't carry an extra empty-state
          * card around. Pending approval, so styled distinctly (violet)
          * rather than looking like a confirmed spot in the queue. */}
@@ -345,7 +378,7 @@ function QueueView({
           <section className="rounded-2xl bg-white p-4 shadow-soft">
             <h2 className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-black/40">
               <span className="h-2 w-2 flex-none rounded-full bg-violet-500" />
-              Requested — pending approval
+              Your request — pending approval
             </h2>
             <ul className="space-y-2">
               {requested.map((g) => (
@@ -477,6 +510,7 @@ function RequestSetForm({
         code,
         player_ids: selected,
         requested_by: trimmedName || null,
+        requester_token: getRequesterToken(),
       });
       if (error) {
         setSubmitError(error.message);

@@ -103,6 +103,15 @@ create table if not exists games (
   -- reviews it. Null for every game logged the normal way (queue master's
   -- own New Game / Edit Game forms never set this).
   requested_by text,
+  -- An opaque per-device id (crypto.randomUUID(), generated client-side and
+  -- kept in localStorage — see JoinForm.tsx), stored on a "Requested" row
+  -- so /join's queue view can show a player only THEIR OWN pending
+  -- requests instead of everyone's (get_queue_by_code below scopes on it).
+  -- Deliberately not the same thing as requested_by: that's a free-text
+  -- name the player may not have bothered typing, this is generated
+  -- automatically regardless. Never shown to anyone, including the queue
+  -- master — purely a filter key.
+  requester_token text,
   created_at timestamptz not null default now(),
   unique (session_id, game_number)
 );
@@ -113,6 +122,9 @@ alter table games add constraint games_status_check check (status in ('Requested
 
 -- safe to re-run against a database created before requested_by existed
 alter table games add column if not exists requested_by text;
+
+-- safe to re-run against a database created before requester_token existed
+alter table games add column if not exists requester_token text;
 
 -- safe to re-run against a database created before winner/score existed
 alter table games add column if not exists winner_team text;
@@ -271,15 +283,23 @@ grant execute on function get_roster_by_code(text) to anon, authenticated;
 -- The queue itself: every not-yet-finished game (Requested, Queued, or
 -- Ongoing) for the session matching that code, with player *names* only —
 -- no ids, no costs, nothing about players who aren't in one of those games.
--- Requested rows are included (not just Queued/Ongoing) so a player who
--- just submitted a request — or anyone else checking the queue — can see
--- it's pending, same list the queue master reviews from their side.
--- `create or replace` can't change a function's return type (adding
--- requested_by below counts as a change) — drop first so re-running this
--- file against a database with the older 6-column version doesn't error.
+-- Queued/Ongoing rows are always included (that's the actual queue — fair
+-- game for anyone to see). A 'Requested' row is different: it's not
+-- approved yet, so it's only included when it's the *caller's own*
+-- request — g.requester_token (set by request_game below, from an opaque
+-- per-device id the client keeps in localStorage) has to match the
+-- viewer_token this call was made with. A request with no requester_token
+-- at all (shouldn't normally happen, but covers old rows/a client that
+-- failed to generate one) never matches anyone and just stays invisible
+-- here — the queue master still sees it fine, that's a separate,
+-- authenticated read straight off the table, not this function.
+-- `create or replace` can't change a function's return type or remove a
+-- parameter — drop first so re-running this file against a database with
+-- an older version doesn't error.
 drop function if exists get_queue_by_code(text);
+drop function if exists get_queue_by_code(text, text);
 
-create function get_queue_by_code(code text)
+create function get_queue_by_code(code text, viewer_token text default null)
 returns table (
   game_number integer,
   status text,
@@ -302,11 +322,14 @@ as $$
   left join players p4 on p4.id = g.player4_id
   where s.join_code = code
     and s.status = 'Open'
-    and g.status in ('Requested', 'Queued', 'Ongoing')
+    and (
+      g.status in ('Queued', 'Ongoing')
+      or (g.status = 'Requested' and g.requester_token is not null and g.requester_token = viewer_token)
+    )
   order by g.game_number;
 $$;
 
-grant execute on function get_queue_by_code(text) to anon, authenticated;
+grant execute on function get_queue_by_code(text, text) to anon, authenticated;
 
 -- Submit a "request a set" from the public /join page. player_ids is 1-4
 -- player ids (order matters — same team split as everywhere else: 1st &
@@ -315,13 +338,29 @@ grant execute on function get_queue_by_code(text) to anon, authenticated;
 -- it wants, so this is the one thing that can't just be trusted from the
 -- client the way the rest of this function's inputs are. requested_by is
 -- an optional free-text name (who to credit/ask), stored as-is, not
--- matched against the roster.
+-- matched against the roster. requester_token is the same opaque per-device
+-- id get_queue_by_code above filters on, so this player's own pending
+-- request is the only one their /join view will show them.
 --
 -- Lands the new row as status 'Requested' — everything else (game_number,
 -- game_date) mirrors what the queue master's own createGame server action
 -- does, so a requested game slots into the same numbering as one they
 -- added themselves.
-create or replace function request_game(code text, player_ids uuid[], requested_by text default null)
+-- Postgres identifies a function by name + parameter TYPES, so adding a
+-- new parameter (even with a default) doesn't let `create or replace`
+-- update the existing 3-arg version in place — it silently creates a
+-- second overload instead, and PostgREST's RPC dispatch then can't tell
+-- which one a named-argument call means. Drop the old signature first so
+-- re-running this file against an already-migrated database doesn't leave
+-- that stale overload behind.
+drop function if exists request_game(text, uuid[], text);
+
+create or replace function request_game(
+  code text,
+  player_ids uuid[],
+  requested_by text default null,
+  requester_token text default null
+)
 returns integer
 language plpgsql
 security definer
@@ -371,14 +410,14 @@ begin
   from games
   where session_id = target_session_id;
 
-  insert into games (session_id, game_number, game_date, status, player1_id, player2_id, player3_id, player4_id, requested_by)
-  values (target_session_id, next_game_number, target_session_date, 'Requested', p1, p2, p3, p4, nullif(trim(requested_by), ''));
+  insert into games (session_id, game_number, game_date, status, player1_id, player2_id, player3_id, player4_id, requested_by, requester_token)
+  values (target_session_id, next_game_number, target_session_date, 'Requested', p1, p2, p3, p4, nullif(trim(requested_by), ''), nullif(trim(requester_token), ''));
 
   return next_game_number;
 end;
 $$;
 
-grant execute on function request_game(text, uuid[], text) to anon, authenticated;
+grant execute on function request_game(text, uuid[], text, text) to anon, authenticated;
 
 -- ---------------------------------------------------------------------------
 -- Row Level Security
