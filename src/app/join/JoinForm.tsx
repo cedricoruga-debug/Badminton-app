@@ -246,7 +246,7 @@ function QueueView({
     <div className="min-h-screen bg-black/[0.02] pb-[max(1.5rem,env(safe-area-inset-bottom))]">
       {/* Hero header, full-bleed — matches the main app's header gradient so
        * this reads as the same product, not a bare fallback page. */}
-      <div className="bg-gradient-to-r from-brand to-accent px-4 pb-9 pt-[max(1.25rem,env(safe-area-inset-top))] text-white shadow-[0_2px_14px_rgba(236,72,153,0.3)]">
+      <div className="bg-gradient-to-r from-brand to-accent px-4 pb-9 pt-[max(1.25rem,env(safe-area-inset-top))] text-white shadow-[0_2px_14px_rgba(120,148,122,0.3)]">
         <div className="mx-auto flex w-full max-w-sm items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2.5">
             <span className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-white/15">
