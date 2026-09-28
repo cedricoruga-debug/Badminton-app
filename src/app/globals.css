@@ -34,6 +34,28 @@ body {
   color: var(--foreground);
 }
 
+/*
+ * The landscape/desktop pages (Dashboard, Sessions, Games) render a fixed
+ * two-pane layout — `landscape:h-[calc(100dvh-60px)] landscape:overflow-hidden`
+ * on the page's own root div — where each pane is meant to scroll on its
+ * own, not the page as a whole. On some browsers/devices that per-element
+ * height cap can still end up a few pixels off (dynamic viewport quirks,
+ * an attached hardware keyboard changing Safari's chrome height, etc.),
+ * which lets the *document* scroll instead — quietly defeating the fixed
+ * layout even though each pane looks right. This is the belt-and-suspenders
+ * backstop: in landscape only (never touches the intentionally
+ * page-scrolling portrait/mobile layout), the document itself simply can't
+ * scroll, so a rounding mismatch just clips a stray pixel instead of
+ * letting the whole page scroll past its panels.
+ */
+@media (orientation: landscape) {
+  html,
+  body {
+    height: 100dvh;
+    overflow: hidden;
+  }
+}
+
 /**
  * Primary "brand" action button — every Save/Add/Create button in the app
  * used a flat `bg-brand` fill with a `hover:bg-brand-dark` swap. This gives

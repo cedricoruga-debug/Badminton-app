@@ -46,9 +46,7 @@ export default async function SessionsPage(props: PageProps<"/sessions">) {
   );
 
   return (
-    <div className="flex flex-col p-4 landscape:h-[calc(100vh-60px)] landscape:overflow-hidden">
-      <Breadcrumb current="Sessions" />
-
+    <div className="flex flex-col p-4 landscape:h-[calc(100dvh-60px)] landscape:overflow-hidden">
       {sessions.length === 0 ? (
         <p className="py-8 text-center text-sm text-black/40">No sessions yet.</p>
       ) : (
@@ -171,18 +169,6 @@ function Stat({
     <div>
       <dt className="text-black/50">{label}</dt>
       <dd className={emphasize ? `text-base font-semibold ${emphasizeColor}` : "font-medium"}>{value}</dd>
-    </div>
-  );
-}
-
-function Breadcrumb({ current }: { current: string }) {
-  return (
-    <div className="mb-4 flex flex-none items-center gap-2 text-sm text-black/50">
-      <Link href="/" className="hover:text-brand">
-        Home
-      </Link>
-      <span>›</span>
-      <span className="text-black/80">{current}</span>
     </div>
   );
 }

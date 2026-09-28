@@ -205,7 +205,7 @@ export function DashboardClient({ seed }: { seed: DashboardSeed }) {
   );
 
   return (
-    <div className="flex flex-col landscape:h-[calc(100vh-60px)] landscape:overflow-hidden">
+    <div className="flex flex-col landscape:h-[calc(100dvh-60px)] landscape:overflow-hidden">
       {isOffline && (
         <div className="flex-none px-4 pt-4">
           <div className="rounded-lg bg-black/70 px-3 py-2 text-center text-xs font-medium text-white">

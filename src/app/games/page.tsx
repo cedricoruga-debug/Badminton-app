@@ -35,7 +35,7 @@ export default async function GamesPage(props: PageProps<"/games">) {
   const sessionOptions = sessions.map((s) => ({ id: s.id, session_date: s.session_date }));
 
   return (
-    <div className="flex flex-col p-4 landscape:h-[calc(100vh-60px)] landscape:overflow-hidden">
+    <div className="flex flex-col p-4 landscape:h-[calc(100dvh-60px)] landscape:overflow-hidden">
       <Breadcrumb current="Games" />
 
       {sessions.length === 0 ? (
