@@ -675,11 +675,13 @@ type UnpaidPlayer = { id: string; name: string; payable: number };
 
 /** Shown instead of the queue once the queue master has ended the session —
  * the QR/code stays valid so a late scanner gets an explanation rather than
- * an error. Also where players settle up: pick your own name (and any
- * friends you're paying for) from the still-unpaid list, see the total with
- * a per-person breakdown, and pay it via the payment QR. The queue master
- * still marks people paid on their side — a paid player just drops off this
- * list on the next refresh. */
+ * an error. Also where players settle up, two ways: "Pay by myself" (pick
+ * your own name and any friends' from a dropdown of the still-unpaid list —
+ * amounts stay hidden until a name is picked, then show in the breakdown
+ * with the total — and pay via the payment QR) or "Pay the queue master
+ * directly" (just an instruction). The queue master still marks people paid
+ * on their side — a paid player just drops off the list on the next
+ * refresh. */
 function EndedView({
   code,
   supabase,
@@ -694,6 +696,8 @@ function EndedView({
   // null = not loaded yet (or the request failed) — distinct from [] (loaded,
   // and everyone has paid).
   const [unpaid, setUnpaid] = useState<UnpaidPlayer[] | null>(null);
+  const [mode, setMode] = useState<"self" | "master" | null>(null);
+  const [dropdownOpen, setDropdownOpen] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState("");
 
@@ -762,86 +766,141 @@ function EndedView({
           </p>
         </div>
 
-        {unpaid !== null && unpaid.length > 0 && (
+        {!everyonePaid && mode === null && (
           <div className="rounded-2xl bg-white p-4 shadow-soft">
-            <h2 className="text-sm font-semibold">Pay for yourself and friends</h2>
-            <p className="mt-0.5 text-xs text-black/50">Tap your name (and your friends&apos;) to see what to pay.</p>
-
-            <input
-              type="search"
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              placeholder="Search name"
-              className="mt-3 w-full rounded-xl border border-black/15 px-3 py-2 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
-            />
-
-            <ul className="mt-2 max-h-72 divide-y divide-black/5 overflow-y-auto">
-              {visible.length === 0 ? (
-                <li className="py-3 text-center text-sm text-black/40">No one by that name.</li>
-              ) : (
-                visible.map((p) => {
-                  const on = selected.has(p.id);
-                  return (
-                    <li key={p.id}>
-                      <button
-                        type="button"
-                        onClick={() => toggle(p.id)}
-                        aria-pressed={on}
-                        className="flex w-full items-center justify-between gap-3 py-2.5 text-left"
-                      >
-                        <span className="flex min-w-0 items-center gap-3">
-                          <span
-                            className={`flex h-5 w-5 flex-none items-center justify-center rounded border text-[11px] font-bold ${
-                              on ? "border-brand bg-brand text-white" : "border-black/20 text-transparent"
-                            }`}
-                          >
-                            ✓
-                          </span>
-                          <span className="truncate text-sm font-medium">{p.name}</span>
-                        </span>
-                        <span className="flex-none text-sm text-black/60">₱{p.payable.toFixed(2)}</span>
-                      </button>
-                    </li>
-                  );
-                })
-              )}
-            </ul>
-          </div>
-        )}
-
-        {picked.length > 0 && (
-          <div className="rounded-2xl bg-white p-4 shadow-soft">
-            <h2 className="text-sm font-semibold">Your total</h2>
-            <ul className="mt-2 space-y-1 text-sm">
-              {picked.map((p) => (
-                <li key={p.id} className="flex justify-between gap-3">
-                  <span className="truncate text-black/70">{p.name}</span>
-                  <span className="flex-none">₱{p.payable.toFixed(2)}</span>
-                </li>
-              ))}
-            </ul>
-            <div className="mt-3 flex items-baseline justify-between border-t border-black/10 pt-3">
-              <span className="text-sm font-semibold">Total to pay</span>
-              <span className="text-xl font-bold text-brand">₱{total.toFixed(2)}</span>
+            <h2 className="text-sm font-semibold">How would you like to pay?</h2>
+            <div className="mt-3 space-y-2">
+              <button
+                type="button"
+                onClick={() => setMode("self")}
+                className="w-full rounded-xl btn-brand px-4 py-3 text-sm font-semibold text-white"
+              >
+                Pay by myself
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("master")}
+                className="w-full rounded-xl border border-brand/40 px-4 py-3 text-sm font-semibold text-brand transition-colors hover:bg-brand-light"
+              >
+                Pay the queue master directly
+              </button>
             </div>
           </div>
         )}
 
-        {!everyonePaid && (
+        {!everyonePaid && mode === "master" && (
           <div className="rounded-2xl bg-white p-5 text-center shadow-soft">
-            {paymentQrUrl ? (
-              <>
-                <p className="mb-3 text-sm font-medium text-brand">
-                  {picked.length > 0 ? `Scan to pay ₱${total.toFixed(2)}` : "Scan to pay"}
-                </p>
-                {/* eslint-disable-next-line @next/next/no-img-element -- external, user-uploaded QR image of unknown origin */}
-                <img src={paymentQrUrl} alt="Payment QR code" width={400} height={400} className="mx-auto h-auto w-full max-w-[320px] rounded" />
-                <p className="mt-3 text-xs text-black/50">After paying, let the queue master know so they can mark you paid.</p>
-              </>
-            ) : (
-              <p className="text-sm text-black/50">Please settle your payment with the queue master.</p>
-            )}
+            <h2 className="text-sm font-semibold">Pay the queue master</h2>
+            <p className="mt-1 text-sm text-black/60">
+              Give your payment to the queue master directly and tell them your name so they can mark you paid.
+            </p>
+            <button type="button" onClick={() => setMode(null)} className="mt-3 text-xs font-medium text-brand hover:underline">
+              Change payment method
+            </button>
           </div>
+        )}
+
+        {!everyonePaid && mode === "self" && (
+          <>
+            <div className="rounded-2xl bg-white p-4 shadow-soft">
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-sm font-semibold">Pay by myself</h2>
+                <button type="button" onClick={() => setMode(null)} className="text-xs font-medium text-brand hover:underline">
+                  Change
+                </button>
+              </div>
+              <p className="mt-0.5 text-xs text-black/50">Choose your name (and your friends&apos;) to see what to pay.</p>
+
+              <button
+                type="button"
+                onClick={() => setDropdownOpen((v) => !v)}
+                aria-expanded={dropdownOpen}
+                className="mt-3 flex w-full items-center justify-between rounded-xl border border-black/15 px-3 py-2.5 text-left text-sm"
+              >
+                <span className={picked.length > 0 ? "font-medium" : "text-black/50"}>
+                  {picked.length > 0 ? `${picked.length} selected` : "Select your name"}
+                </span>
+                <span className={`text-black/40 transition-transform ${dropdownOpen ? "rotate-180" : ""}`}>▾</span>
+              </button>
+
+              {dropdownOpen && (
+                <div className="mt-1 rounded-xl border border-black/10">
+                  <input
+                    type="search"
+                    value={filter}
+                    onChange={(e) => setFilter(e.target.value)}
+                    placeholder="Search name"
+                    className="w-full rounded-t-xl border-b border-black/10 px-3 py-2 text-sm outline-none"
+                  />
+                  {unpaid === null ? (
+                    <p className="px-3 py-3 text-center text-sm text-black/40">Loading names…</p>
+                  ) : (
+                    <ul className="max-h-60 divide-y divide-black/5 overflow-y-auto">
+                      {visible.length === 0 ? (
+                        <li className="px-3 py-3 text-center text-sm text-black/40">No one by that name.</li>
+                      ) : (
+                        visible.map((p) => {
+                          const on = selected.has(p.id);
+                          return (
+                            <li key={p.id}>
+                              <button
+                                type="button"
+                                onClick={() => toggle(p.id)}
+                                aria-pressed={on}
+                                className="flex w-full items-center gap-3 px-3 py-2.5 text-left"
+                              >
+                                <span
+                                  className={`flex h-5 w-5 flex-none items-center justify-center rounded border text-[11px] font-bold ${
+                                    on ? "border-brand bg-brand text-white" : "border-black/20 text-transparent"
+                                  }`}
+                                >
+                                  ✓
+                                </span>
+                                <span className="truncate text-sm font-medium">{p.name}</span>
+                              </button>
+                            </li>
+                          );
+                        })
+                      )}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {picked.length > 0 && (
+              <div className="rounded-2xl bg-white p-4 shadow-soft">
+                <h2 className="text-sm font-semibold">Your total</h2>
+                <ul className="mt-2 space-y-1 text-sm">
+                  {picked.map((p) => (
+                    <li key={p.id} className="flex justify-between gap-3">
+                      <span className="truncate text-black/70">{p.name}</span>
+                      <span className="flex-none">₱{p.payable.toFixed(2)}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-3 flex items-baseline justify-between border-t border-black/10 pt-3">
+                  <span className="text-sm font-semibold">Total to pay</span>
+                  <span className="text-xl font-bold text-brand">₱{total.toFixed(2)}</span>
+                </div>
+              </div>
+            )}
+
+            <div className="rounded-2xl bg-white p-5 text-center shadow-soft">
+              {paymentQrUrl ? (
+                <>
+                  <p className="mb-3 text-sm font-medium text-brand">
+                    {picked.length > 0 ? `Scan to pay ₱${total.toFixed(2)}` : "Scan to pay"}
+                  </p>
+                  {/* eslint-disable-next-line @next/next/no-img-element -- external, user-uploaded QR image of unknown origin */}
+                  <img src={paymentQrUrl} alt="Payment QR code" width={400} height={400} className="mx-auto h-auto w-full max-w-[320px] rounded" />
+                  <p className="mt-3 text-xs text-black/50">After paying, let the queue master know so they can mark you paid.</p>
+                </>
+              ) : (
+                <p className="text-sm text-black/50">No payment QR is set up — please pay the queue master directly.</p>
+              )}
+            </div>
+          </>
         )}
       </div>
     </div>
