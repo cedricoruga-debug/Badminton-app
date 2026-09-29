@@ -15,8 +15,9 @@ type GameForStatus = Pick<Game, "id" | "game_number" | "status" | "player1_id" |
  * list row — a court "card" that's actually happening right now deserves to
  * look like it. Marked up like a real court, not just a green rectangle:
  * an outer boundary, the net (the thick center line) splitting it into the
- * two teams left vs. right, and a short service line near the net on each
- * side. Broadcast-angle style — player1 + player2 on the left, player3 +
+ * two teams left vs. right, and on each side the short service line, the
+ * doubles long service line, the singles sidelines, and the center line
+ * (running back from the short service line). Broadcast-angle style — player1 + player2 on the left, player3 +
  * player4 on the right, each name sitting in its own corner — same 2-vs-2
  * layout the New Game/edit form uses to pick players, and both rows share
  * the exact same green (no shading difference between them).
@@ -94,7 +95,7 @@ export function CourtBox({
           </button>
 
           {/* The court itself: an outer boundary, the net down the middle,
-           * and a short service line near the net on each side — 2 players
+           * and the service/side/center lines on each side (see TeamHalf) — 2 players
            * a side, each half its own tap target for the winner shortcut
            * and, once armed, its own Confirm. Wider than tall — the net
            * runs down the middle instead of across it — with room for a
@@ -159,7 +160,17 @@ function TeamHalf({
   netEdge: "left" | "right";
 }) {
   const netBorder = netEdge === "right" ? "border-r-[3px] border-white/90" : "";
-  const serviceLinePosition = netEdge === "right" ? "right-[22%]" : "left-[22%]";
+
+  // Line positions, as a share of this half's length (net to back edge =
+  // 6.7m on a real court) and width (6.1m): the short service line sits
+  // 1.98m from the net (~30%), the doubles long service line 0.76m in from
+  // the back edge (~11%), the singles sidelines 0.46m in from each side
+  // (~7.5%), and the center line only runs from the short service line back
+  // to the back edge — not between the service line and the net.
+  const nearNet = netEdge === "right" ? "right" : "left";
+  const shortServiceLine = nearNet === "right" ? "right-[30%]" : "left-[30%]";
+  const longServiceLine = nearNet === "right" ? "left-[11%]" : "right-[11%]";
+  const centerLine = nearNet === "right" ? "left-0" : "right-0";
 
   if (armed) {
     const teamLabel = names.filter(Boolean).join(" & ") || "—";
@@ -186,12 +197,14 @@ function TeamHalf({
       type="button"
       disabled={disabled}
       onClick={onTap}
-      className={`relative grid flex-1 grid-rows-2 divide-y divide-white/60 transition-colors disabled:cursor-not-allowed hover:bg-white/10 active:bg-white/15 ${netBorder}`}
+      className={`relative grid flex-1 grid-rows-2 transition-colors disabled:cursor-not-allowed hover:bg-white/10 active:bg-white/15 ${netBorder}`}
     >
-      <span
-        aria-hidden="true"
-        className={`pointer-events-none absolute inset-y-0 w-0 border-r border-white/40 ${serviceLinePosition}`}
-      />
+      {/* Court markings — purely decorative, drawn under the names */}
+      <span aria-hidden="true" className={`pointer-events-none absolute inset-y-0 w-0 border-r-2 border-white/60 ${shortServiceLine}`} />
+      <span aria-hidden="true" className={`pointer-events-none absolute inset-y-0 w-0 border-r-2 border-white/60 ${longServiceLine}`} />
+      <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-[7.5%] h-0 border-t-2 border-white/60" />
+      <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-[7.5%] h-0 border-t-2 border-white/60" />
+      <span aria-hidden="true" className={`pointer-events-none absolute top-1/2 h-0 w-[70%] border-t-2 border-white/60 ${centerLine}`} />
       <PlayerCell name={names[0]} />
       <PlayerCell name={names[1]} />
     </button>
