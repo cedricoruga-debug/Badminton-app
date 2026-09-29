@@ -56,7 +56,7 @@ export default function LoginPage() {
           <span className="flex h-12 w-12 items-center justify-center rounded-full btn-brand text-white">
             <IconShuttle className="h-6 w-6" />
           </span>
-          <h1 className="text-lg font-semibold">Queuing App by Ced</h1>
+          <h1 className="text-lg font-semibold">KRO5 Badminton</h1>
           <p className="text-sm text-black/50">Sign in to continue</p>
         </div>
 

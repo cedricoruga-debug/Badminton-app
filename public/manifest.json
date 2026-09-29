@@ -1,6 +1,6 @@
 {
-  "name": "Queuing App by Ced",
-  "short_name": "Badminton Queue",
+  "name": "KRO5 Badminton",
+  "short_name": "KRO5",
   "description": "Saturday badminton session queuing and fee tracker",
   "start_url": "/",
   "scope": "/",

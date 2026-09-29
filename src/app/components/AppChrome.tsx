@@ -9,7 +9,7 @@ import { registerServiceWorker } from "@/lib/registerSW";
 import { createClient } from "@/lib/supabase/client";
 import type { AppSettings } from "@/lib/types";
 
-const APP_TITLE = "Queuing App by Ced";
+const APP_TITLE = "KRO5 Badminton";
 
 /** Every table a page on this site reads from — a change to any of them
  * could be showing on someone else's screen right now. */

@@ -19,7 +19,7 @@ import { currentUserRole } from "@/lib/accounts";
 import { getAppSettings } from "@/lib/queries";
 import { createClient } from "@/lib/supabase/server";
 
-const APP_TITLE = "Queuing App by Ced";
+const APP_TITLE = "KRO5 Badminton";
 
 export const metadata: Metadata = {
   title: APP_TITLE,
