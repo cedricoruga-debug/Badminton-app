@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { GameRow } from "@/app/components/GameRow";
 import { NewGameButton } from "@/app/components/NewGameButton";
-import { getAllGames, getAllSessions, getPlayerSessions } from "@/lib/queries";
+import { getAllGames, getPlayerSessions, getSessionOptions } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +15,8 @@ export default async function GamesPage(props: PageProps<"/games">) {
   const searchParams = await props.searchParams;
   const requestedSession = typeof searchParams.session === "string" ? searchParams.session : undefined;
 
-  const [sessions, allGames] = await Promise.all([getAllSessions(), getAllGames()]);
+  // Only id + date are used below — not getAllSessions()'s payment totals.
+  const [sessions, allGames] = await Promise.all([getSessionOptions(), getAllGames()]);
 
   const gameCounts = new Map<string, number>();
   for (const g of allGames) {
@@ -32,7 +33,7 @@ export default async function GamesPage(props: PageProps<"/games">) {
     : [];
   const selectedPlayers = selectedSessionId ? await getPlayerSessions(selectedSessionId) : [];
 
-  const sessionOptions = sessions.map((s) => ({ id: s.id, session_date: s.session_date }));
+  const sessionOptions = sessions;
 
   return (
     <div className="flex flex-col p-4 landscape:h-[calc(100dvh-60px)] landscape:overflow-hidden">

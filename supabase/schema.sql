@@ -445,11 +445,23 @@ drop policy if exists "Require login" on games;
 drop policy if exists "Require login" on player_sessions;
 drop policy if exists "Require login" on app_settings;
 
-create policy "Require login" on players for all using (auth.uid() is not null) with check (auth.uid() is not null);
-create policy "Require login" on sessions for all using (auth.uid() is not null) with check (auth.uid() is not null);
-create policy "Require login" on games for all using (auth.uid() is not null) with check (auth.uid() is not null);
-create policy "Require login" on player_sessions for all using (auth.uid() is not null) with check (auth.uid() is not null);
-create policy "Require login" on app_settings for all using (auth.uid() is not null) with check (auth.uid() is not null);
+-- `(select auth.uid())` rather than a bare `auth.uid()`: Postgres re-evaluates
+-- a bare function call per row scanned, but hoists the sub-select and runs it
+-- once per query (Supabase advisor lint: auth_rls_initplan).
+create policy "Require login" on players for all using ((select auth.uid()) is not null) with check ((select auth.uid()) is not null);
+create policy "Require login" on sessions for all using ((select auth.uid()) is not null) with check ((select auth.uid()) is not null);
+create policy "Require login" on games for all using ((select auth.uid()) is not null) with check ((select auth.uid()) is not null);
+create policy "Require login" on player_sessions for all using ((select auth.uid()) is not null) with check ((select auth.uid()) is not null);
+create policy "Require login" on app_settings for all using ((select auth.uid()) is not null) with check ((select auth.uid()) is not null);
+
+-- Indexes on foreign-key columns (Postgres doesn't create these automatically).
+-- games.player1..4_id back the embedded player1:player1_id(*) joins used by
+-- every games/dashboard query.
+create index if not exists games_player1_id_idx on games (player1_id);
+create index if not exists games_player2_id_idx on games (player2_id);
+create index if not exists games_player3_id_idx on games (player3_id);
+create index if not exists games_player4_id_idx on games (player4_id);
+create index if not exists player_sessions_player_id_idx on player_sessions (player_id);
 
 -- ---------------------------------------------------------------------------
 -- Realtime
@@ -515,8 +527,8 @@ drop policy if exists "Require login to delete (assets)" on storage.objects;
 create policy "Allow all read (assets)" on storage.objects
   for select using (bucket_id = 'assets');
 create policy "Require login to write (assets)" on storage.objects
-  for insert with check (bucket_id = 'assets' and auth.uid() is not null);
+  for insert with check (bucket_id = 'assets' and (select auth.uid()) is not null);
 create policy "Require login to update (assets)" on storage.objects
-  for update using (bucket_id = 'assets' and auth.uid() is not null);
+  for update using (bucket_id = 'assets' and (select auth.uid()) is not null);
 create policy "Require login to delete (assets)" on storage.objects
-  for delete using (bucket_id = 'assets' and auth.uid() is not null);
+  for delete using (bucket_id = 'assets' and (select auth.uid()) is not null);

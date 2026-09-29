@@ -179,6 +179,27 @@ export async function getAllSessions(): Promise<SessionWithTotal[]> {
   });
 }
 
+export type SessionOption = { id: string; session_date: string };
+
+/**
+ * Just id + date for every session, newest first — what the session
+ * pickers on the dashboard and Games page actually need. Deliberately not
+ * getAllSessions(): that one joins every session's player_sessions rows to
+ * compute payment totals, which those pages never display, and it grows
+ * with the whole session history on every load (and every live refresh).
+ */
+export async function getSessionOptions(): Promise<SessionOption[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("sessions")
+    .select("id, session_date")
+    .order("session_date", { ascending: false });
+  if (error) {
+    console.error("[getSessionOptions] Supabase error:", error);
+  }
+  return data ?? [];
+}
+
 export type GameFlat = GameWithPlayers & { session: { session_date: string } | null };
 
 /** All games across every session, most recent first (capped at 200 rows). */

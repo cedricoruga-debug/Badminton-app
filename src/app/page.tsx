@@ -1,6 +1,6 @@
 import { DashboardClient, type DashboardSeed } from "@/app/components/DashboardClient";
 import { SetupRequired } from "@/app/setup-required";
-import { getAllSessions, getAppSettings, getGames, getLatestSession, getPlayerSessions } from "@/lib/queries";
+import { getAppSettings, getGames, getLatestSession, getPlayerSessions, getSessionOptions } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -24,9 +24,15 @@ export default async function Home() {
     return <SetupRequired />;
   }
 
-  const settings = await getAppSettings();
-  const session = await getLatestSession();
-  const sessions = await getAllSessions();
+  // The first three don't depend on each other, so run them together — they
+  // used to run one after another, each waiting on its own full round trip
+  // to the database. Sessions here is just the picker list (id + date), not
+  // the per-session payment totals the Sessions page computes.
+  const [settings, session, sessions] = await Promise.all([
+    getAppSettings(),
+    getLatestSession(),
+    getSessionOptions(),
+  ]);
   const [sessionPlayers, games] = session
     ? await Promise.all([getPlayerSessions(session.id), getGames(session.id)])
     : [[], []];

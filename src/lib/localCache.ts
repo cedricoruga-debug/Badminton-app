@@ -27,14 +27,17 @@
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
 // Type-only import from queries.ts (a server-only module) — erased at
 // compile time, so it doesn't pull any server code into the client bundle.
-import type { GameWithPlayers, SessionWithTotal } from "@/lib/queries";
+import type { GameWithPlayers, SessionOption } from "@/lib/queries";
 import type { AppSettings, Game, Player, PlayerSession, PlayerSessionWithPlayer, Session } from "@/lib/types";
 
 const DB_NAME = "badminton-dashboard-cache";
 const DB_VERSION = 1;
 
 interface DashboardDB extends DBSchema {
-  sessions: { key: string; value: SessionWithTotal };
+  /** Every session as a picker option (id + date); the active session's row
+   * is additionally overwritten with its full `Session` fields (see
+   * seedFromServer) — that's the only one the dashboard renders in full. */
+  sessions: { key: string; value: SessionOption & Partial<Session> };
   games: { key: string; value: Game; indexes: { session_id: string } };
   players: { key: string; value: Player };
   player_sessions: { key: string; value: PlayerSession; indexes: { session_id: string } };
@@ -117,9 +120,8 @@ function getDB(): Promise<IDBPDatabase<DashboardDB>> | null {
 export type DashboardData = {
   settings: AppSettings | null;
   session: Session | null;
-  /** All sessions (for pickers in the New/Edit Game modal) — a short list,
-   * cheap to keep around in full rather than trimming to the active one. */
-  sessions: SessionWithTotal[];
+  /** All sessions (for pickers in the New/Edit Game modal) — id + date only. */
+  sessions: SessionOption[];
   sessionPlayers: PlayerSessionWithPlayer[];
   games: GameWithPlayers[];
 };
@@ -139,6 +141,9 @@ export async function seedFromServer(data: DashboardData): Promise<void> {
   const sessionsStore = tx.objectStore("sessions");
   await sessionsStore.clear();
   for (const s of data.sessions) await sessionsStore.put(s);
+  // Overwrite the active session's option row with its full fields, so an
+  // offline load can rebuild it (hours, fees, join code…) from this store.
+  if (data.session) await sessionsStore.put(data.session);
 
   if (data.settings) await tx.objectStore("app_settings").put(data.settings);
 
@@ -194,11 +199,15 @@ export async function loadActiveDashboardData(): Promise<DashboardData | null> {
 
   const settings = (await db.get("app_settings", 1)) ?? null;
 
-  const sessions = await db.getAll("sessions");
-  sessions.sort((a, b) => (a.session_date < b.session_date ? 1 : a.session_date > b.session_date ? -1 : 0));
+  const storedSessions = await db.getAll("sessions");
+  storedSessions.sort((a, b) => (a.session_date < b.session_date ? 1 : a.session_date > b.session_date ? -1 : 0));
+  const sessions: SessionOption[] = storedSessions.map((s) => ({ id: s.id, session_date: s.session_date }));
 
   const activeSessionId = ((await db.get("meta", "activeSessionId")) as string | null) ?? null;
-  const session = activeSessionId ? (sessions.find((s) => s.id === activeSessionId) ?? null) : null;
+  const activeRow = activeSessionId ? storedSessions.find((s) => s.id === activeSessionId) : undefined;
+  // Only a row that carries the full fields counts (a bare option row means
+  // the cache was never fully seeded for it).
+  const session = activeRow && "court_fee" in activeRow ? (activeRow as Session) : null;
 
   const playersById = new Map<string, Player>();
   for (const p of await db.getAll("players")) playersById.set(p.id, p);
