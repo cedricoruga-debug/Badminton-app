@@ -167,7 +167,7 @@ export function DashboardClient({ seed }: { seed: DashboardSeed }) {
     <>
       <NewSessionButton />
 
-      <Link href="/games" className="flex flex-col items-center gap-1">
+      <Link href="/games" className="shortcut-tile flex flex-col items-center gap-1">
         <span className="flex h-9 w-9 items-center justify-center rounded-full btn-brand text-white transition-transform hover:scale-105">
           <IconTrophy className="h-4 w-4" />
         </span>
@@ -183,7 +183,7 @@ export function DashboardClient({ seed }: { seed: DashboardSeed }) {
           nextGameNumber={totalGameCount + 1}
         />
       ) : (
-        <div className="flex flex-col items-center gap-1 opacity-40">
+        <div className="shortcut-tile flex flex-col items-center gap-1 opacity-40">
           <span className="flex h-9 w-9 items-center justify-center rounded-full btn-brand text-white">
             <IconPlus className="h-5 w-5" />
           </span>
@@ -194,7 +194,7 @@ export function DashboardClient({ seed }: { seed: DashboardSeed }) {
       {session ? (
         <NewPlayerButton sessions={sessions} defaultSessionId={session.id} />
       ) : (
-        <div className="flex flex-col items-center gap-1 opacity-40">
+        <div className="shortcut-tile flex flex-col items-center gap-1 opacity-40">
           <span className="flex h-9 w-9 items-center justify-center rounded-full btn-brand text-white">
             <IconUserPlus className="h-4 w-4" />
           </span>
@@ -221,7 +221,7 @@ export function DashboardClient({ seed }: { seed: DashboardSeed }) {
        * panel below, so this bar is hidden there instead. */}
       <div className="sticky top-[60px] z-30 flex-none px-4 pt-4 landscape:hidden">
         <div className="rounded-xl bg-white p-3 shadow-soft">
-          <div className="grid grid-cols-2 gap-x-2 gap-y-3 text-center">{shortcutButtons}</div>
+          <div className="grid grid-cols-2 gap-2 text-center">{shortcutButtons}</div>
         </div>
       </div>
 
@@ -310,7 +310,7 @@ export function DashboardClient({ seed }: { seed: DashboardSeed }) {
         <section className="min-w-0 overflow-x-hidden rounded-xl bg-white p-4 shadow-soft landscape:order-3 landscape:h-full landscape:overflow-y-auto">
           <PaymentQrSection qrUrl={settings?.payment_qr_url ?? null} />
 
-          <div className="mt-5 hidden grid-cols-2 gap-x-2 gap-y-3 text-center landscape:grid">
+          <div className="mt-5 hidden grid-cols-2 gap-2 text-center landscape:grid">
             {shortcutButtons}
           </div>
 

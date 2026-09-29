@@ -74,7 +74,7 @@ export function GameRow({
                     ` (${game.score1 ?? "–"}-${game.score2 ?? "–"})`}
                 </p>
               )}
-              {game.status === "Requested" && game.requested_by && (
+              {(game.status === "Requested" || game.status === "Queued") && game.requested_by && (
                 <p className="mt-0.5 text-xs text-violet-700">Requested by {game.requested_by}</p>
               )}
             </div>

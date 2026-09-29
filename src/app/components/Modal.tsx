@@ -42,7 +42,7 @@ export function Modal({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="flex flex-col items-center gap-1"
+          className="shortcut-tile flex flex-col items-center gap-1"
         >
           <span className="flex h-9 w-9 items-center justify-center rounded-full btn-brand text-white transition-transform hover:scale-105">
             {icon}

@@ -31,7 +31,7 @@ export function NewPlayerButton({
 
   if (!open) {
     return (
-      <button type="button" onClick={() => setOpen(true)} className="flex flex-col items-center gap-1">
+      <button type="button" onClick={() => setOpen(true)} className="shortcut-tile flex flex-col items-center gap-1">
         <span className="flex h-9 w-9 items-center justify-center rounded-full btn-brand text-white transition-transform hover:scale-105">
           <IconUserPlus className="h-4 w-4" />
         </span>
