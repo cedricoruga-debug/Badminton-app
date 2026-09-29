@@ -137,10 +137,12 @@ export function PlayerSessionRow({
              * status/payment badges below squeezed it down to a couple of
              * characters in a narrow column (the dashboard's Players panel
              * in particular). Only the payable amount, a single short
-             * number, shares this line. */}
+             * number, shares this line — and only once the player is Done,
+             * since showing a running total for someone still mid-session
+             * (games still being added) reads as presumptuous/greedy. */}
             <div className="flex min-w-0 items-baseline justify-between gap-2">
               <p className="min-w-0 truncate font-semibold">{ps.player.name}</p>
-              <p className="flex-none font-semibold">₱{ps.payable.toFixed(2)}</p>
+              {ps.done_for_session && <p className="flex-none font-semibold">₱{ps.payable.toFixed(2)}</p>}
             </div>
 
             <div className="flex items-center justify-between gap-2">
@@ -257,7 +259,11 @@ export function PlayerSessionRow({
               </div>
               <div>
                 <dt className="text-black/50">Amount payable</dt>
-                <dd className="text-base font-semibold">₱{ps.payable.toFixed(2)}</dd>
+                {ps.done_for_session ? (
+                  <dd className="text-base font-semibold">₱{ps.payable.toFixed(2)}</dd>
+                ) : (
+                  <dd className="text-sm text-black/40">Shown once marked done</dd>
+                )}
               </div>
             </dl>
 
