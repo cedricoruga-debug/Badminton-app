@@ -9,6 +9,7 @@ import { JoinQrSection } from "@/app/components/JoinQrSection";
 import { LiveDot } from "@/app/components/LiveDot";
 import { NewGameButton } from "@/app/components/NewGameButton";
 import { NewPlayerButton } from "@/app/components/NewPlayerButton";
+import { EndSessionButton } from "@/app/components/EndSessionButton";
 import { NewSessionButton } from "@/app/components/NewSessionButton";
 import { PaymentQrSection } from "@/app/components/PaymentQrSection";
 import { PlayerSessionRow } from "@/app/components/PlayerSessionRow";
@@ -165,7 +166,7 @@ export function DashboardClient({ seed }: { seed: DashboardSeed }) {
   // pattern as the nav rail vs. bottom nav bar in SidePanel.
   const shortcutButtons = (
     <>
-      <NewSessionButton />
+      {session?.status === "Open" ? <EndSessionButton sessionId={session.id} /> : <NewSessionButton />}
 
       <Link href="/games" className="shortcut-tile flex flex-col items-center gap-1">
         <span className="flex h-9 w-9 items-center justify-center rounded-full btn-brand text-white transition-transform hover:scale-105">
@@ -363,7 +364,7 @@ export function DashboardClient({ seed }: { seed: DashboardSeed }) {
            * you'd only pull up in the moment a new player's arriving. */}
           {session && (
             <div className="mt-5 border-t border-black/10 pt-4">
-              <JoinQrSection sessionId={session.id} joinCode={session.join_code} />
+              <JoinQrSection sessionId={session.id} joinCode={session.join_code} ended={session.status === "Closed"} />
             </div>
           )}
         </section>

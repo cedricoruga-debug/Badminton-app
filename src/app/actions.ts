@@ -591,6 +591,11 @@ export async function createSession(formData: FormData) {
   const supabase = await createClient();
   const joinCode = await generateUniqueJoinCode(supabase);
 
+  // Only one session is ever "live" — starting a new one ends any that was
+  // still open, so an old QR can't keep showing a queue that's over.
+  const { error: closeError } = await supabase.from("sessions").update({ status: "Closed" }).eq("status", "Open");
+  if (closeError) throw new Error(closeError.message);
+
   const { error } = await supabase.from("sessions").insert({
     session_date: sessionDate,
     hours,
@@ -603,6 +608,22 @@ export async function createSession(formData: FormData) {
   if (error) throw new Error(error.message);
   revalidatePath("/");
   redirect("/");
+}
+
+/**
+ * End a session (the dashboard's "End Session" button, behind a confirm
+ * dialog). Marks it Closed: from then on its join QR/code stops showing the
+ * queue and shows a "session ended" screen with the payment QR instead (see
+ * get_session_join_info in schema.sql). Everything stays on the dashboard —
+ * payments can still be recorded.
+ */
+export async function endSession(sessionId: string) {
+  const supabase = await createClient();
+  const { error } = await supabase.from("sessions").update({ status: "Closed" }).eq("id", sessionId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/");
+  revalidatePath("/sessions");
 }
 
 /**

@@ -18,7 +18,16 @@ import { backfillSessionJoinCode } from "@/app/actions";
  * payment QR's own toggle: it only matters in the moment someone wants to
  * check the queue, no reason for it to sit on-screen the rest of the time.
  */
-export function JoinQrSection({ sessionId, joinCode }: { sessionId: string; joinCode: string | null }) {
+export function JoinQrSection({
+  sessionId,
+  joinCode,
+  ended = false,
+}: {
+  sessionId: string;
+  joinCode: string | null;
+  /** Session has been ended — the link now shows "session ended" + payment QR. */
+  ended?: boolean;
+}) {
   const [isPending, startTransition] = useTransition();
 
   if (!joinCode) {
@@ -44,6 +53,11 @@ export function JoinQrSection({ sessionId, joinCode }: { sessionId: string; join
     <div className="flex flex-col items-center gap-2">
       <p className="text-xs font-semibold uppercase tracking-wide text-black/40">View queue by QR</p>
       <JoinQrToggle joinCode={joinCode} />
+      {ended && (
+        <p className="text-center text-[11px] font-medium text-amber-700">
+          Session ended — players who scan now see the payment QR.
+        </p>
+      )}
     </div>
   );
 }

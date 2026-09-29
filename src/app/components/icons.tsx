@@ -208,3 +208,12 @@ export function IconLogout({ className }: IconProps) {
     </svg>
   );
 }
+
+export function IconFlag({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M5 21V4" />
+      <path d="M5 4h11l-2 4 2 4H5" />
+    </svg>
+  );
+}

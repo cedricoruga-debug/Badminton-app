@@ -18,7 +18,7 @@ export function NewSessionButton() {
   const today = todayLocalISODate();
 
   return (
-    <Modal label="New Session" icon={<IconCalendarPlus className="h-4 w-4" />} title="New Session">
+    <Modal label="Start Session" icon={<IconCalendarPlus className="h-4 w-4" />} title="Start Session">
       {(close) => (
         <form action={createSession} className="space-y-4">
           <div>

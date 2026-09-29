@@ -115,6 +115,9 @@ export function JoinForm({ initialCode = "" }: { initialCode?: string }) {
   const [sessionDate, setSessionDate] = useState<string | null>(null);
   const [games, setGames] = useState<QueueGame[] | null>(null);
   const [confirmedCode, setConfirmedCode] = useState<string | null>(null);
+  // Set when the code belongs to a session that's been ended — shows the
+  // "session ended" screen (with the payment QR) instead of the queue.
+  const [ended, setEnded] = useState<{ sessionDate: string | null; paymentQrUrl: string | null } | null>(null);
   const [isPending, startTransition] = useTransition();
   const [supabase] = useState<SupabaseBrowserClient>(() => createClient());
   // Arriving from the QR (?code=123456) skips the entry form entirely: load
@@ -128,6 +131,22 @@ export function JoinForm({ initialCode = "" }: { initialCode?: string }) {
         code: c,
       });
       const session = matches?.[0];
+      if (!lookupError && !session) {
+        // No *open* session for this code — but if it's a real session that
+        // was ended, that's a different message than a wrong code.
+        const { data: info } = await supabase.rpc("get_session_join_info", { code: c });
+        const found = info?.[0];
+        if (found?.status === "Closed") {
+          setEnded({
+            sessionDate: (found.session_date as string | null) ?? null,
+            paymentQrUrl: (found.payment_qr_url as string | null) ?? null,
+          });
+          setError(null);
+          setConfirmedCode(null);
+          setGames(null);
+          return;
+        }
+      }
       if (lookupError || !session) {
         if (!opts.silent) {
           setError(
@@ -216,6 +235,10 @@ export function JoinForm({ initialCode = "" }: { initialCode?: string }) {
         <p className="text-sm text-black/50">Loading the queue…</p>
       </div>
     );
+  }
+
+  if (ended) {
+    return <EndedView sessionDate={ended.sessionDate} paymentQrUrl={ended.paymentQrUrl} />;
   }
 
   if (confirmedCode && games) {
@@ -641,6 +664,50 @@ function EmptyRow({ text }: { text: string }) {
   return (
     <div className="flex h-16 items-center justify-center rounded-xl border border-dashed border-black/10 text-center text-sm text-black/40">
       {text}
+    </div>
+  );
+}
+
+/** Shown instead of the queue once the queue master has ended the session —
+ * the QR/code stays valid so a late scanner gets an explanation (and the
+ * payment QR) rather than an error. */
+function EndedView({ sessionDate, paymentQrUrl }: { sessionDate: string | null; paymentQrUrl: string | null }) {
+  return (
+    <div className="min-h-screen bg-black/[0.02] pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+      <div className="bg-brand px-4 pb-9 pt-[max(1.25rem,env(safe-area-inset-top))] text-white shadow-[0_2px_14px_rgba(54,201,143,0.3)]">
+        <div className="mx-auto flex w-full max-w-sm items-center gap-2.5">
+          <span className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-white/15">
+            <IconShuttle className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-white/75">Session ended</p>
+            <p className="truncate text-base font-semibold">
+              {sessionDate
+                ? new Date(sessionDate).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })
+                : "—"}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="mx-auto -mt-5 w-full max-w-sm px-4">
+        <div className="rounded-2xl bg-white p-5 text-center shadow-soft">
+          <h1 className="text-lg font-semibold">Thanks for playing!</h1>
+          <p className="mt-1 text-sm text-black/60">This session has ended and the queue is closed.</p>
+
+          <div className="mt-5 border-t border-black/10 pt-5">
+            {paymentQrUrl ? (
+              <>
+                <p className="mb-3 text-sm font-medium text-brand">Scan to pay</p>
+                {/* eslint-disable-next-line @next/next/no-img-element -- external, user-uploaded QR image of unknown origin */}
+                <img src={paymentQrUrl} alt="Payment QR code" width={400} height={400} className="mx-auto h-auto w-full max-w-[320px] rounded" />
+              </>
+            ) : (
+              <p className="text-sm text-black/50">Please settle your payment with the queue master.</p>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

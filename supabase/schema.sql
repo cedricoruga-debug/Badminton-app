@@ -258,6 +258,24 @@ $$;
 
 grant execute on function find_session_by_join_code(text) to anon, authenticated;
 
+-- Lets the public /join page tell "session ended" apart from "wrong code",
+-- and show the payment QR on the ended screen, without giving anon any read
+-- access to sessions/app_settings themselves. Works for Open and Closed.
+create or replace function get_session_join_info(code text)
+returns table (status text, session_date date, payment_qr_url text)
+language sql
+security definer
+set search_path = public
+as $$
+  select s.status, s.session_date, a.payment_qr_url
+  from sessions s
+  left join app_settings a on a.id = 1
+  where s.join_code = code
+  limit 1;
+$$;
+
+grant execute on function get_session_join_info(text) to anon, authenticated;
+
 -- The roster a player picks from when requesting a set: everyone
 -- registered for the session who isn't marked done_for_session, name only
 -- (no costs, no payment info) — same shape the queue master's own player
