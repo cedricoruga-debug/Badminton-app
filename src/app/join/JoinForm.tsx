@@ -117,7 +117,7 @@ export function JoinForm({ initialCode = "" }: { initialCode?: string }) {
   const [confirmedCode, setConfirmedCode] = useState<string | null>(null);
   // Set when the code belongs to a session that's been ended — shows the
   // "session ended" screen (with the payment QR) instead of the queue.
-  const [ended, setEnded] = useState<{ sessionDate: string | null; paymentQrUrl: string | null } | null>(null);
+  const [ended, setEnded] = useState<{ code: string; sessionDate: string | null; paymentQrUrl: string | null } | null>(null);
   const [isPending, startTransition] = useTransition();
   const [supabase] = useState<SupabaseBrowserClient>(() => createClient());
   // Arriving from the QR (?code=123456) skips the entry form entirely: load
@@ -138,6 +138,7 @@ export function JoinForm({ initialCode = "" }: { initialCode?: string }) {
         const found = info?.[0];
         if (found?.status === "Closed") {
           setEnded({
+            code: c,
             sessionDate: (found.session_date as string | null) ?? null,
             paymentQrUrl: (found.payment_qr_url as string | null) ?? null,
           });
@@ -238,7 +239,9 @@ export function JoinForm({ initialCode = "" }: { initialCode?: string }) {
   }
 
   if (ended) {
-    return <EndedView sessionDate={ended.sessionDate} paymentQrUrl={ended.paymentQrUrl} />;
+    return (
+      <EndedView code={ended.code} supabase={supabase} sessionDate={ended.sessionDate} paymentQrUrl={ended.paymentQrUrl} />
+    );
   }
 
   if (confirmedCode && games) {
@@ -668,10 +671,71 @@ function EmptyRow({ text }: { text: string }) {
   );
 }
 
+type UnpaidPlayer = { id: string; name: string; payable: number };
+
 /** Shown instead of the queue once the queue master has ended the session —
- * the QR/code stays valid so a late scanner gets an explanation (and the
- * payment QR) rather than an error. */
-function EndedView({ sessionDate, paymentQrUrl }: { sessionDate: string | null; paymentQrUrl: string | null }) {
+ * the QR/code stays valid so a late scanner gets an explanation rather than
+ * an error. Also where players settle up: pick your own name (and any
+ * friends you're paying for) from the still-unpaid list, see the total with
+ * a per-person breakdown, and pay it via the payment QR. The queue master
+ * still marks people paid on their side — a paid player just drops off this
+ * list on the next refresh. */
+function EndedView({
+  code,
+  supabase,
+  sessionDate,
+  paymentQrUrl,
+}: {
+  code: string;
+  supabase: SupabaseBrowserClient;
+  sessionDate: string | null;
+  paymentQrUrl: string | null;
+}) {
+  // null = not loaded yet (or the request failed) — distinct from [] (loaded,
+  // and everyone has paid).
+  const [unpaid, setUnpaid] = useState<UnpaidPlayer[] | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [filter, setFilter] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      const { data, error } = await supabase.rpc("get_unpaid_by_code", { code });
+      if (cancelled || error) return;
+      setUnpaid(
+        ((data as { id: string; name: string; payable: number | string }[] | null) ?? []).map((r) => ({
+          id: r.id,
+          name: r.name,
+          payable: Number(r.payable),
+        }))
+      );
+    }
+    load();
+    // People get marked paid on the queue master's side while this is open —
+    // keep the list honest, same idea as the live queue's poll.
+    const interval = setInterval(load, POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [code, supabase]);
+
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  // Derived from the current list rather than pruned from `selected`, so
+  // someone who gets marked paid mid-selection simply drops out of the total.
+  const picked = (unpaid ?? []).filter((p) => selected.has(p.id));
+  const total = picked.reduce((sum, p) => sum + p.payable, 0);
+  const visible = (unpaid ?? []).filter((p) => p.name.toLowerCase().includes(filter.trim().toLowerCase()));
+  const everyonePaid = unpaid !== null && unpaid.length === 0;
+
   return (
     <div className="min-h-screen bg-black/[0.02] pb-[max(1.5rem,env(safe-area-inset-bottom))]">
       <div className="bg-brand px-4 pb-9 pt-[max(1.25rem,env(safe-area-inset-top))] text-white shadow-[0_2px_14px_rgba(54,201,143,0.3)]">
@@ -690,23 +754,95 @@ function EndedView({ sessionDate, paymentQrUrl }: { sessionDate: string | null; 
         </div>
       </div>
 
-      <div className="mx-auto -mt-5 w-full max-w-sm px-4">
+      <div className="mx-auto -mt-5 w-full max-w-sm space-y-4 px-4">
         <div className="rounded-2xl bg-white p-5 text-center shadow-soft">
           <h1 className="text-lg font-semibold">Thanks for playing!</h1>
-          <p className="mt-1 text-sm text-black/60">This session has ended and the queue is closed.</p>
+          <p className="mt-1 text-sm text-black/60">
+            {everyonePaid ? "Everyone has paid — see you next game day." : "This session has ended and the queue is closed."}
+          </p>
+        </div>
 
-          <div className="mt-5 border-t border-black/10 pt-5">
+        {unpaid !== null && unpaid.length > 0 && (
+          <div className="rounded-2xl bg-white p-4 shadow-soft">
+            <h2 className="text-sm font-semibold">Pay for yourself and friends</h2>
+            <p className="mt-0.5 text-xs text-black/50">Tap your name (and your friends&apos;) to see what to pay.</p>
+
+            <input
+              type="search"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              placeholder="Search name"
+              className="mt-3 w-full rounded-xl border border-black/15 px-3 py-2 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+            />
+
+            <ul className="mt-2 max-h-72 divide-y divide-black/5 overflow-y-auto">
+              {visible.length === 0 ? (
+                <li className="py-3 text-center text-sm text-black/40">No one by that name.</li>
+              ) : (
+                visible.map((p) => {
+                  const on = selected.has(p.id);
+                  return (
+                    <li key={p.id}>
+                      <button
+                        type="button"
+                        onClick={() => toggle(p.id)}
+                        aria-pressed={on}
+                        className="flex w-full items-center justify-between gap-3 py-2.5 text-left"
+                      >
+                        <span className="flex min-w-0 items-center gap-3">
+                          <span
+                            className={`flex h-5 w-5 flex-none items-center justify-center rounded border text-[11px] font-bold ${
+                              on ? "border-brand bg-brand text-white" : "border-black/20 text-transparent"
+                            }`}
+                          >
+                            ✓
+                          </span>
+                          <span className="truncate text-sm font-medium">{p.name}</span>
+                        </span>
+                        <span className="flex-none text-sm text-black/60">₱{p.payable.toFixed(2)}</span>
+                      </button>
+                    </li>
+                  );
+                })
+              )}
+            </ul>
+          </div>
+        )}
+
+        {picked.length > 0 && (
+          <div className="rounded-2xl bg-white p-4 shadow-soft">
+            <h2 className="text-sm font-semibold">Your total</h2>
+            <ul className="mt-2 space-y-1 text-sm">
+              {picked.map((p) => (
+                <li key={p.id} className="flex justify-between gap-3">
+                  <span className="truncate text-black/70">{p.name}</span>
+                  <span className="flex-none">₱{p.payable.toFixed(2)}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-3 flex items-baseline justify-between border-t border-black/10 pt-3">
+              <span className="text-sm font-semibold">Total to pay</span>
+              <span className="text-xl font-bold text-brand">₱{total.toFixed(2)}</span>
+            </div>
+          </div>
+        )}
+
+        {!everyonePaid && (
+          <div className="rounded-2xl bg-white p-5 text-center shadow-soft">
             {paymentQrUrl ? (
               <>
-                <p className="mb-3 text-sm font-medium text-brand">Scan to pay</p>
+                <p className="mb-3 text-sm font-medium text-brand">
+                  {picked.length > 0 ? `Scan to pay ₱${total.toFixed(2)}` : "Scan to pay"}
+                </p>
                 {/* eslint-disable-next-line @next/next/no-img-element -- external, user-uploaded QR image of unknown origin */}
                 <img src={paymentQrUrl} alt="Payment QR code" width={400} height={400} className="mx-auto h-auto w-full max-w-[320px] rounded" />
+                <p className="mt-3 text-xs text-black/50">After paying, let the queue master know so they can mark you paid.</p>
               </>
             ) : (
               <p className="text-sm text-black/50">Please settle your payment with the queue master.</p>
             )}
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

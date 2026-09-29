@@ -276,6 +276,27 @@ $$;
 
 grant execute on function get_session_join_info(text) to anon, authenticated;
 
+-- For the public "session ended" page: who hasn't paid yet, and how much.
+-- Only for an ended session (status 'Closed'); anon gets names + amounts
+-- only, keyed by the player_sessions id so duplicate names stay distinct.
+create or replace function get_unpaid_by_code(code text)
+returns table (id uuid, name text, payable numeric)
+language sql
+security definer
+set search_path = public
+as $$
+  select ps.id, p.name, ps.payable
+  from player_sessions ps
+  join sessions s on s.id = ps.session_id
+  join players p on p.id = ps.player_id
+  where s.join_code = code
+    and s.status = 'Closed'
+    and ps.payment_method is null
+  order by p.name;
+$$;
+
+grant execute on function get_unpaid_by_code(text) to anon, authenticated;
+
 -- The roster a player picks from when requesting a set: everyone
 -- registered for the session who isn't marked done_for_session, name only
 -- (no costs, no payment info) — same shape the queue master's own player
