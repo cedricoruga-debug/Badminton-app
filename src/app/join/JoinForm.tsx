@@ -117,6 +117,10 @@ export function JoinForm({ initialCode = "" }: { initialCode?: string }) {
   const [confirmedCode, setConfirmedCode] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [supabase] = useState<SupabaseBrowserClient>(() => createClient());
+  // Arriving from the QR (?code=123456) skips the entry form entirely: load
+  // the queue right away and show a brief loading state instead. Only if that
+  // code turns out to be wrong/closed does the form appear, with the error.
+  const [autoLoading, setAutoLoading] = useState(() => /^\d{6}$/.test(initialCode));
 
   const loadQueue = useCallback(
     async (c: string, opts: { silent?: boolean } = {}) => {
@@ -185,6 +189,34 @@ export function JoinForm({ initialCode = "" }: { initialCode?: string }) {
     const interval = setInterval(() => loadQueue(confirmedCode, { silent: true }), POLL_MS);
     return () => clearInterval(interval);
   }, [confirmedCode, loadQueue]);
+
+  useEffect(() => {
+    if (!autoLoading) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        await loadQueue(initialCode);
+      } finally {
+        // Even if the request itself blew up (offline, etc.), fall back to
+        // the code form rather than sitting on the spinner forever.
+        if (!cancelled) setAutoLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [autoLoading, initialCode, loadQueue]);
+
+  if (autoLoading) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-black/[0.02] p-4">
+        <span className="flex h-14 w-14 animate-pulse items-center justify-center rounded-full btn-brand text-white shadow-lg shadow-brand/30">
+          <IconShuttle className="h-7 w-7" />
+        </span>
+        <p className="text-sm text-black/50">Loading the queue…</p>
+      </div>
+    );
+  }
 
   if (confirmedCode && games) {
     return (
