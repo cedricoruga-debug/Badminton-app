@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { backfillSessionJoinCode } from "@/app/actions";
+import { backfillSessionJoinCode, reopenSession } from "@/app/actions";
 
 /**
  * The "view queue by QR" block at the very bottom of the dashboard's
@@ -54,9 +54,19 @@ export function JoinQrSection({
       <p className="text-xs font-semibold uppercase tracking-wide text-black/40">View queue by QR</p>
       <JoinQrToggle joinCode={joinCode} />
       {ended && (
-        <p className="text-center text-[11px] font-medium text-amber-700">
-          Session ended — players who scan now see the payment QR.
-        </p>
+        <div className="flex flex-col items-center gap-1">
+          <p className="text-center text-[11px] font-medium text-amber-700">
+            Session ended — players who scan now see the payment QR.
+          </p>
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={() => startTransition(() => reopenSession(sessionId))}
+            className="text-[11px] font-medium text-brand hover:underline disabled:opacity-50"
+          >
+            {isPending ? "Reopening…" : "Reopen session"}
+          </button>
+        </div>
       )}
     </div>
   );

@@ -627,6 +627,20 @@ export async function endSession(sessionId: string) {
 }
 
 /**
+ * Undo "End Session" — make an ended session live again (the dashboard's
+ * "Reopen session" link). Its join QR/code shows the live queue again.
+ * Only offered for the newest session, so it can't end up with two open.
+ */
+export async function reopenSession(sessionId: string) {
+  const supabase = await createClient();
+  const { error } = await supabase.from("sessions").update({ status: "Open" }).eq("id", sessionId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/");
+  revalidatePath("/sessions");
+}
+
+/**
  * Backfill a join_code for a session that predates this feature (join_code
  * is nullable for exactly this reason — see schema.sql). Surfaced as a
  * "Generate join code" button on the dashboard for any session missing one.
