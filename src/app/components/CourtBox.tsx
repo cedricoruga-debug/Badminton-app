@@ -200,11 +200,11 @@ function TeamHalf({
       className={`relative grid flex-1 grid-rows-2 transition-colors disabled:cursor-not-allowed hover:bg-white/10 active:bg-white/15 ${netBorder}`}
     >
       {/* Court markings — purely decorative, drawn under the names */}
-      <span aria-hidden="true" className={`pointer-events-none absolute inset-y-0 w-0 border-r-2 border-white/60 ${shortServiceLine}`} />
-      <span aria-hidden="true" className={`pointer-events-none absolute inset-y-0 w-0 border-r-2 border-white/60 ${longServiceLine}`} />
-      <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-[7.5%] h-0 border-t-2 border-white/60" />
-      <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-[7.5%] h-0 border-t-2 border-white/60" />
-      <span aria-hidden="true" className={`pointer-events-none absolute top-1/2 h-0 w-[70%] border-t-2 border-white/60 ${centerLine}`} />
+      <span aria-hidden="true" className={`pointer-events-none absolute inset-y-0 w-0 border-r border-white/45 ${shortServiceLine}`} />
+      <span aria-hidden="true" className={`pointer-events-none absolute inset-y-0 w-0 border-r border-white/45 ${longServiceLine}`} />
+      <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-[7.5%] h-0 border-t border-white/45" />
+      <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-[7.5%] h-0 border-t border-white/45" />
+      <span aria-hidden="true" className={`pointer-events-none absolute top-1/2 h-0 w-[70%] border-t border-white/45 ${centerLine}`} />
       <PlayerCell name={names[0]} />
       <PlayerCell name={names[1]} />
     </button>
@@ -213,8 +213,8 @@ function TeamHalf({
 
 function PlayerCell({ name }: { name?: string | null }) {
   return (
-    <div className="flex min-w-0 items-center justify-center px-1.5 py-2 text-center">
-      <span className="break-words text-base font-bold leading-tight text-white">{name ?? "—"}</span>
+    <div className="relative z-10 flex min-w-0 items-center justify-center px-1.5 py-2 text-center">
+      <span className="break-words text-base font-bold leading-tight text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.5)]">{name ?? "—"}</span>
     </div>
   );
 }
