@@ -5,7 +5,7 @@ import { createServerClient } from "@supabase/ssr";
 /**
  * Gatekeeper for the whole app — Next.js 16 renamed `middleware.ts` to
  * `proxy.ts` (same mechanism, new name/export). Every request except
- * `/login` and `/join` requires a signed-in Supabase user; unauthenticated
+ * `/login`, `/join` and `/welcome` (marketing page, served at "/" when signed out) requires a signed-in Supabase user; unauthenticated
  * visitors are bounced to `/login`, and a signed-in user hitting `/login`
  * (or `/join` — an admin has no reason to be there) is bounced to `/`.
  * `/join` is the one deliberately public page: a player without an account
@@ -26,7 +26,12 @@ import { createServerClient } from "@supabase/ssr";
  * for this small private app is low (worst case is a confusing error
  * instead of a redirect, not exposed data).
  */
-const PUBLIC_PATHS = ["/login", "/join"];
+const PUBLIC_PATHS = ["/login", "/join", "/welcome"];
+
+/** Public pages a signed-in user has no reason to see, so they're bounced to
+ * the dashboard instead. `/welcome` (the marketing page) is deliberately not
+ * in here — anyone may look at it, signed in or not. */
+const SIGNED_OUT_ONLY_PATHS = ["/login", "/join"];
 
 export async function proxy(request: NextRequest) {
   // No Supabase configured yet (first-run / local setup) — let the
@@ -60,7 +65,19 @@ export async function proxy(request: NextRequest) {
     data: { session },
   } = await supabase.auth.getSession();
 
-  const isPublicPath = PUBLIC_PATHS.includes(request.nextUrl.pathname);
+  const pathname = request.nextUrl.pathname;
+  const isPublicPath = PUBLIC_PATHS.includes(pathname);
+
+  // The site's front door: a signed-out visitor to "/" sees the marketing
+  // page (rewritten, so the URL stays "/"), while a signed-in queue master
+  // gets the dashboard at the very same URL.
+  if (!session && pathname === "/") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/welcome";
+    const rewritten = NextResponse.rewrite(url);
+    response.cookies.getAll().forEach((c) => rewritten.cookies.set(c));
+    return rewritten;
+  }
 
   if (!session && !isPublicPath) {
     const url = request.nextUrl.clone();
@@ -68,7 +85,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (session && isPublicPath) {
+  if (session && SIGNED_OUT_ONLY_PATHS.includes(pathname)) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     return NextResponse.redirect(url);

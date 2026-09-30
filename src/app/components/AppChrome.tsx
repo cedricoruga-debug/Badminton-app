@@ -135,7 +135,7 @@ function useLiveRefresh(enabled: boolean) {
  * its own centered card layout, and a visitor there either isn't signed in
  * yet (`/login`) or never will be (`/join`, the public queue-viewing page),
  * so the nav links to pages they can't use would just be confusing. */
-const CHROMELESS_PATHS = ["/login", "/join"];
+const CHROMELESS_PATHS = ["/login", "/join", "/welcome"];
 
 /**
  * Wraps every page with the header + right-hand icon rail — except the
@@ -144,14 +144,19 @@ const CHROMELESS_PATHS = ["/login", "/join"];
 export function AppChrome({
   settings,
   isAdmin,
+  isSignedIn,
   children,
 }: {
   settings: AppSettings | null;
   isAdmin: boolean;
+  isSignedIn: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const isChromeless = CHROMELESS_PATHS.includes(pathname);
+  // A signed-out visitor at "/" is looking at the marketing page (proxy.ts
+  // rewrites it to /welcome, and the browser URL stays "/"), so that counts
+  // as chromeless too — no dashboard header or nav around a landing page.
+  const isChromeless = CHROMELESS_PATHS.includes(pathname) || (!isSignedIn && pathname === "/");
 
   // Registers the service worker that backs installability + the
   // dashboard's offline support (see public/sw.js and

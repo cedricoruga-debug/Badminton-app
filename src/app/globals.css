@@ -103,3 +103,44 @@ body {
   background-color: #dcf3e6;
   border-color: rgba(54, 201, 143, 0.6);
 }
+
+/*
+ * The marketing page (/welcome, also served at "/" when signed out) is an
+ * ordinary long, page-scrolling document — the landscape lock above is for
+ * the dashboard's fixed two-pane layout and would otherwise trap it.
+ */
+@media (orientation: landscape) {
+  html:has([data-scroll-page]),
+  body:has([data-scroll-page]) {
+    height: auto;
+    overflow: visible;
+  }
+}
+
+html {
+  scroll-behavior: smooth;
+}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .float-slow,
+  .float-slower {
+    animation: none !important;
+  }
+}
+
+@keyframes float-y {
+  0%, 100% { transform: translateY(0) rotate(var(--r, 0deg)); }
+  50% { transform: translateY(-10px) rotate(var(--r, 0deg)); }
+}
+.float-slow { animation: float-y 5s ease-in-out infinite; }
+.float-slower { animation: float-y 7s ease-in-out infinite; }
+
+/* Court-line texture behind hero/CTA sections. */
+.court-lines {
+  background-image:
+    linear-gradient(rgba(255,255,255,0.14) 2px, transparent 2px),
+    linear-gradient(90deg, rgba(255,255,255,0.14) 2px, transparent 2px);
+  background-size: 72px 72px;
+}

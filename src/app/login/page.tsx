@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { IconShuttle } from "@/app/components/icons";
@@ -50,53 +51,71 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-black/[0.02] p-4">
-      <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-soft">
-        <div className="mb-6 flex flex-col items-center gap-2">
-          <span className="flex h-12 w-12 items-center justify-center rounded-full btn-brand text-white">
+    <div className="relative isolate flex min-h-screen items-center justify-center overflow-hidden bg-brand p-4">
+      <div aria-hidden className="court-lines absolute inset-0 -z-10 opacity-60" />
+      <div className="w-full max-w-sm">
+        <Link
+          href="/"
+          className="mb-5 flex items-center justify-center gap-2 text-white"
+          aria-label="KRO5 Badminton home"
+        >
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20">
             <IconShuttle className="h-6 w-6" />
           </span>
-          <h1 className="text-lg font-semibold">KRO5 Badminton</h1>
-          <p className="text-sm text-black/50">Sign in to continue</p>
+          <span className="text-xl font-extrabold tracking-tight">
+            KRO5 <span className="font-semibold opacity-80">Badminton</span>
+          </span>
+        </Link>
+
+        <div className="rounded-3xl bg-white p-7 shadow-[0_30px_60px_-20px_rgba(23,42,35,0.6)]">
+          <h1 className="text-2xl font-extrabold text-brand-dark">Welcome back</h1>
+          <p className="mb-6 mt-1 text-sm font-medium text-brand-dark/55">Sign in to run your session.</p>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-brand-dark">Username</label>
+              <input
+                type="text"
+                required
+                autoFocus
+                autoCapitalize="none"
+                autoCorrect="off"
+                autoComplete="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="w-full rounded-xl border border-black/15 px-3.5 py-2.5 text-sm outline-none transition focus:border-brand focus:ring-4 focus:ring-brand/20"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-brand-dark">Password</label>
+              <input
+                type="password"
+                required
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full rounded-xl border border-black/15 px-3.5 py-2.5 text-sm outline-none transition focus:border-brand focus:ring-4 focus:ring-brand/20"
+              />
+            </div>
+
+            {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full rounded-full btn-brand px-4 py-3 text-sm font-bold text-white disabled:opacity-50"
+            >
+              {loading ? "Signing in…" : "Sign in"}
+            </button>
+          </form>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-brand">Username</label>
-            <input
-              type="text"
-              required
-              autoFocus
-              autoCapitalize="none"
-              autoCorrect="off"
-              autoComplete="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="w-full rounded border border-black/15 px-3 py-2 text-sm"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-brand">Password</label>
-            <input
-              type="password"
-              required
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded border border-black/15 px-3 py-2 text-sm"
-            />
-          </div>
-
-          {error && <p className="text-sm text-red-600">{error}</p>}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded btn-brand px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-          >
-            {loading ? "Signing in…" : "Sign in"}
-          </button>
-        </form>
+        <p className="mt-5 text-center text-sm font-semibold text-white/90">
+          Just here to play?{" "}
+          <Link href="/join" className="underline underline-offset-2 hover:text-white">
+            See the live queue
+          </Link>
+        </p>
       </div>
     </div>
   );

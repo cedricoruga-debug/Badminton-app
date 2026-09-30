@@ -23,7 +23,7 @@ const APP_TITLE = "KRO5 Badminton";
 
 export const metadata: Metadata = {
   title: APP_TITLE,
-  description: "Saturday badminton session queuing and fee tracker",
+  description: "Fun, simple badminton queuing for queue masters and badminton enthusiasts.",
   manifest: "/manifest.json",
   icons: {
     icon: "/icons/icon-512.png",
@@ -47,23 +47,26 @@ export const viewport: Viewport = {
  * runs in RootLayout, i.e. on every single page render, so a `getUser()`
  * here was adding a second per-request network round trip right back on
  * top of the one proxy.ts already eliminated. */
-async function getIsAdmin(): Promise<boolean> {
+async function getAuthState(): Promise<{ isAdmin: boolean; isSignedIn: boolean }> {
   const supabase = await createClient();
   const {
     data: { session },
   } = await supabase.auth.getSession();
-  return currentUserRole(session?.user ?? undefined) === "admin";
+  return {
+    isAdmin: currentUserRole(session?.user ?? undefined) === "admin",
+    isSignedIn: !!session,
+  };
 }
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
-  const [settings, isAdmin] = process.env.NEXT_PUBLIC_SUPABASE_URL
-    ? await Promise.all([getAppSettings(), getIsAdmin()])
-    : [null, false];
+  const [settings, { isAdmin, isSignedIn }] = process.env.NEXT_PUBLIC_SUPABASE_URL
+    ? await Promise.all([getAppSettings(), getAuthState()])
+    : [null, { isAdmin: false, isSignedIn: false }];
 
   return (
     <html lang="en" className="h-full antialiased">
       <body className="min-h-full font-sans">
-        <AppChrome settings={settings} isAdmin={isAdmin}>
+        <AppChrome settings={settings} isAdmin={isAdmin} isSignedIn={isSignedIn}>
           {children}
         </AppChrome>
       </body>
