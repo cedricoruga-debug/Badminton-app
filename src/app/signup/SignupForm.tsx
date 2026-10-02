@@ -9,13 +9,13 @@ const SPORTS = [
   {
     value: "badminton" as const,
     label: "Badminton",
-    blurb: "Doubles queue, shuttle cost per game",
+    blurb: "Doubles queue, rally to 21",
     Icon: IconShuttle,
   },
   {
     value: "pickleball" as const,
     label: "Pickleball",
-    blurb: "Open play, balls split per session",
+    blurb: "Open play, games to 11",
     Icon: IconPickleball,
   },
 ];

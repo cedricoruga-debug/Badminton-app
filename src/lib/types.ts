@@ -25,6 +25,12 @@ export type Session = {
    * model); 'fixed' = everyone pays a flat `fixed_fee`. */
   fee_mode: FeeMode;
   fixed_fee: number;
+  /** Simple pricing ('simple' fee mode): 'total' = court_amount is the whole
+   * court rent, split evenly; 'per_player' = everyone pays court_amount. */
+  court_fee_type: CourtFeeType;
+  court_amount: number;
+  /** Simple pricing: charged per game a player plays. */
+  per_game_fee: number;
   created_at: string;
 };
 
@@ -69,6 +75,8 @@ export type PlayerSession = {
   /** The session's fixed fee copied onto this row when the session is in
    * fixed-rate mode (null in split mode) — the `payable` formula reads it. */
   fixed_fee: number | null;
+  /** Copy of the club's round_up_buffer setting (round up to ₱10, +₱10). */
+  use_buffer: boolean;
   payable: number;
   payment_method: "Cash" | "Gcash" | null;
   done_for_session: boolean;
@@ -81,7 +89,11 @@ export type PlayerSessionWithPlayer = PlayerSession & {
 
 export type Sport = "badminton" | "pickleball";
 
-export type FeeMode = "split" | "fixed";
+/** 'simple' = court fee + price per game (the default for new sessions);
+ * 'split' = the original hours × rate + shuttle tube model; 'fixed' = flat fee. */
+export type FeeMode = "simple" | "split" | "fixed";
+
+export type CourtFeeType = "total" | "per_player";
 
 /** One tenant: a badminton or pickleball group with its own players,
  * sessions, accounts, payment QR and icon. */
@@ -92,6 +104,9 @@ export type Club = {
   payment_qr_url: string | null;
   app_icon_url: string | null;
   owner_id: string | null;
+  /** Round each player's amount up to the next ₱10, then add ₱10 (the
+   * original group's rule). Off for new clubs. */
+  round_up_buffer: boolean;
   created_at: string;
   updated_at: string;
 };

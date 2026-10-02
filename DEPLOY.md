@@ -96,3 +96,12 @@ sessions, games, payments, settings and staff accounts.
 - **Pickleball clubs:** ball cost is split evenly per session (balls last all
   night) instead of per game, scores hint "to 11", and live courts are drawn as
   pickleball courts with the kitchen.
+
+## 8. Simple pricing + uploads (v3.1)
+
+Run `supabase/simple_pricing.sql`. New sessions ask for just a court fee (total
+rent split evenly, or per player) and a price per game. The "round up to ₱10,
++₱10" rule is a per-club setting (`clubs.round_up_buffer`), on only for the
+original club. QR/icon uploads now go server-side into the `club-assets` bucket
+(no client write access), and the old `assets` bucket refuses new uploads — so
+no extra storage-policy setup is needed.

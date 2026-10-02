@@ -36,7 +36,7 @@ export function EditSessionButton({ session }: { session: Session }) {
         <form action={updateSession} className="space-y-4">
           <input type="hidden" name="session_id" value={session.id} />
 
-          <SessionCostFields defaults={session} autoFocus />
+          <SessionCostFields session={session} autoFocus />
 
           <div className="flex items-center justify-between border-t border-black/10 pt-4">
             <div>

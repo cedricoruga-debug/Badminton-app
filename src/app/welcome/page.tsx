@@ -294,7 +294,7 @@ function QueueRow({ n, a, b, tag, hot = false }: { n: number; a: string; b: stri
 function TrustStrip() {
   const items = [
     { k: "Live", v: "queue that updates on every phone" },
-    { k: "Auto", v: "fee split — or a flat rate" },
+    { k: "2", v: "numbers to price a session" },
     { k: "Buzz", v: "when it's your turn" },
     { k: "0", v: "apps to download" },
   ];
@@ -322,7 +322,7 @@ function Sports() {
       tint: "bg-emerald-600",
       points: [
         "Doubles queue with Magic Queue suggestions",
-        "Shuttle cost split by games actually played",
+        "Pay per game played — whoever plays more, pays more",
         "Rally scoring to 21, tap-to-crown winners",
       ],
     },
@@ -332,7 +332,7 @@ function Sports() {
       tint: "bg-sky-600",
       points: [
         "Open-play queue that replaces the paddle stack",
-        "Flat open-play rate, or split court + balls per session",
+        "Flat open-play court fee per player, plus per-game pricing",
         "Games to 11, live courts with the kitchen drawn in",
       ],
     },
@@ -383,7 +383,7 @@ function HowItWorks() {
     {
       icon: <IconCalendar className="h-6 w-6" />,
       title: "Open a session",
-      body: "Set the court hours and shuttle or ball cost — or just a flat fee. Add whoever showed up; new faces take seconds.",
+      body: "Enter the court fee and your price per game. Add whoever showed up — new faces take seconds.",
     },
     {
       icon: <IconRacket className="h-6 w-6" />,
@@ -431,8 +431,8 @@ function Features() {
     },
     {
       icon: <IconPeso className="h-6 w-6" />,
-      title: "Automatic fee split",
-      body: "Split court time and shuttles or balls fairly — or charge everyone a fixed open-play rate and see your real profit. No calculator, no spreadsheet.",
+      title: "Simple, fair pricing",
+      body: "Court fee (split the rent or charge per player) plus a price per game — you set your own margin and see your earnings. No calculator, no spreadsheet.",
     },
     {
       icon: <IconPhone className="h-6 w-6" />,
@@ -495,7 +495,7 @@ function TwoSides() {
           <ul className="mt-6 space-y-3 font-medium text-white/85">
             {[
               "Create sessions and add a whole roster in seconds",
-              "Split costs or charge a fixed rate per player",
+              "Price sessions with a court fee + price per game",
               "Queue games and move them onto live courts",
               "Record winners with a single tap",
               "See exactly who owes what — and collect it",

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getClubContext } from "@/lib/accounts";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -68,12 +69,14 @@ async function recomputePlayerGameCounts(
       .in("status", ["Ongoing", "Done"]),
     supabase
       .from("sessions")
-      .select("court_share_per_player, shuttle_fee_per_game, shuttle_tube_cost, fee_mode, fixed_fee")
+      .select(
+        "court_share_per_player, shuttle_fee_per_game, shuttle_tube_cost, fee_mode, fixed_fee, court_fee_type, court_amount, per_game_fee"
+      )
       .eq("id", sessionId)
       .single(),
     supabase.from("player_sessions").select("id, player_id, discount_percent").eq("session_id", sessionId),
     // RLS only ever returns the signed-in user's own club row.
-    supabase.from("clubs").select("sport").maybeSingle(),
+    supabase.from("clubs").select("sport, round_up_buffer").maybeSingle(),
   ]);
   if (gamesError) throw new Error(gamesError.message);
   if (sessionError) throw new Error(sessionError.message);
@@ -81,6 +84,8 @@ async function recomputePlayerGameCounts(
 
   const sport = club?.sport ?? "badminton";
   const isFixed = session.fee_mode === "fixed";
+  const isSimple = session.fee_mode === "simple";
+  const useBuffer = club?.round_up_buffer ?? false;
   const rosterSize = (playerSessions ?? []).length;
   // Pickleball balls are a whole-session cost, split evenly like the court.
   const ballSharePerPlayer =
@@ -93,8 +98,16 @@ async function recomputePlayerGameCounts(
     }
   }
 
-  const courtSharePerPlayer = Number(session.court_share_per_player);
-  const shuttleFeePerGame = Number(session.shuttle_fee_per_game);
+  // Simple pricing: court fee (whole rent split evenly, or flat per player)
+  // + a price per game played. Otherwise the original model.
+  const courtSharePerPlayer = isSimple
+    ? session.court_fee_type === "per_player"
+      ? Number(session.court_amount)
+      : rosterSize > 0
+        ? Math.round((Number(session.court_amount) / rosterSize) * 100) / 100
+        : 0
+    : Number(session.court_share_per_player);
+  const shuttleFeePerGame = isSimple ? Number(session.per_game_fee) : Number(session.shuttle_fee_per_game);
 
   // Pass 1: fresh total_games/court_share/shuttle_share per player, plus
   // how much pesos their own discount_percent (if any) saves them.
@@ -102,7 +115,7 @@ async function recomputePlayerGameCounts(
     const totalGames = counts.get(ps.player_id) ?? 0;
     const courtShare = courtSharePerPlayer;
     const shuttleShare =
-      sport === "pickleball"
+      sport === "pickleball" && !isSimple
         ? Math.round(ballSharePerPlayer * 100) / 100
         : totalGames * shuttleFeePerGame;
     const savedAmount =
@@ -136,6 +149,7 @@ async function recomputePlayerGameCounts(
       discount_percent: ps.discount_percent,
       surcharge_amount: ps.discount_percent === 0 ? Math.round(perPlayerSurcharge * 100) / 100 : 0,
       fixed_fee: isFixed ? Number(session.fixed_fee) : null,
+      use_buffer: useBuffer,
     }));
     const { error } = await supabase.from("player_sessions").upsert(rows, { onConflict: "id" });
     if (error) throw new Error(error.message);
@@ -559,24 +573,29 @@ export async function updateAppSettings(formData: FormData) {
   const sport = String(formData.get("sport") ?? "");
   if (sport === "badminton" || sport === "pickleball") updates.sport = sport;
 
+  // Uploads go through the server with the service-role key, into the
+  // "club-assets" bucket, which has no write access for signed-in users at
+  // all — so one club can never overwrite another club's QR or icon.
+  // (Only reached after the admin check above.)
+  const storage = createAdminClient().storage.from("club-assets");
+  async function upload(file: File, folder: string, label: string) {
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const path = `${clubId}/${folder}/${Date.now()}-${safeName}`;
+    const { error } = await storage.upload(path, file, { contentType: file.type });
+    if (error) throw new Error(`${label} upload failed: ${error.message}`);
+    return storage.getPublicUrl(path).data.publicUrl;
+  }
+
   const appIcon = formData.get("app_icon");
   if (appIcon instanceof File && appIcon.size > 0) {
-    const path = `${clubId}/app-icon/${Date.now()}-${appIcon.name}`;
-    const { error } = await supabase.storage
-      .from("assets")
-      .upload(path, appIcon, { contentType: appIcon.type, upsert: true });
-    if (error) throw new Error(`App icon upload failed: ${error.message}`);
-    updates.app_icon_url = supabase.storage.from("assets").getPublicUrl(path).data.publicUrl;
+    if (!appIcon.type.startsWith("image/")) throw new Error("App icon must be an image.");
+    updates.app_icon_url = await upload(appIcon, "app-icon", "App icon");
   }
 
   const qrCode = formData.get("qr_code");
   if (qrCode instanceof File && qrCode.size > 0) {
-    const path = `${clubId}/qr/${Date.now()}-${qrCode.name}`;
-    const { error } = await supabase.storage
-      .from("assets")
-      .upload(path, qrCode, { contentType: qrCode.type, upsert: true });
-    if (error) throw new Error(`QR image upload failed: ${error.message}`);
-    updates.payment_qr_url = supabase.storage.from("assets").getPublicUrl(path).data.publicUrl;
+    if (!qrCode.type.startsWith("image/")) throw new Error("QR code must be an image.");
+    updates.payment_qr_url = await upload(qrCode, "qr", "QR image");
   }
 
   if (Object.keys(updates).length > 0) {
@@ -606,14 +625,20 @@ async function generateUniqueJoinCode(
   return data as string;
 }
 
-/** Reads the fee-mode fields shared by the New and Edit Session forms. */
+/** Reads the pricing fields shared by the New and Edit Session forms.
+ * New sessions always use simple pricing (court fee + price per game);
+ * sessions created before it keep their original model when edited. */
 function parseFeeFields(formData: FormData) {
-  const feeMode = formData.get("fee_mode") === "fixed" ? "fixed" : "split";
-  const fixedFee = Math.max(0, Number(formData.get("fixed_fee") ?? 0) || 0);
-  if (feeMode === "fixed" && fixedFee <= 0) {
-    throw new Error("Enter the fixed fee per player.");
-  }
-  return { fee_mode: feeMode, fixed_fee: feeMode === "fixed" ? fixedFee : 0 };
+  const mode = String(formData.get("fee_mode") ?? "simple");
+  const num = (key: string) => Math.max(0, Number(formData.get(key) ?? 0) || 0);
+  if (mode === "split") return { fee_mode: "split" as const };
+  if (mode === "fixed") return { fee_mode: "fixed" as const, fixed_fee: num("fixed_fee") };
+  return {
+    fee_mode: "simple" as const,
+    court_fee_type: formData.get("court_fee_type") === "per_player" ? "per_player" : "total",
+    court_amount: num("court_amount"),
+    per_game_fee: num("per_game_fee"),
+  };
 }
 
 /**

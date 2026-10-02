@@ -43,10 +43,23 @@ export default async function SessionsPage(props: PageProps<"/sessions">) {
   const collectedCash = selectedPlayers
     .filter((ps) => ps.payment_method === "Cash")
     .reduce((sum, ps) => sum + ps.payable, 0);
-  const totalEarning = paidPlayers.reduce(
-    (sum, ps) => sum + (ps.payable - ps.court_share - ps.shuttle_share),
-    0
-  );
+  // Simple pricing: the per-game price is the queue master's margin (and
+  // shuttles/balls), so earning = collected minus the court rent when the
+  // rent was entered as a total; with a per-player court fee the real rent
+  // isn't known, so it's just what's been collected.
+  const isSimple = selectedSession?.fee_mode === "simple";
+  const totalEarning = isSimple
+    ? selectedSession!.court_fee_type === "total"
+      ? totalCollected - selectedSession!.court_amount
+      : totalCollected
+    : paidPlayers.reduce((sum, ps) => sum + (ps.payable - ps.court_share - ps.shuttle_share), 0);
+  const earningLabel = isSimple
+    ? selectedSession!.court_fee_type === "total"
+      ? "Earning (collected − court rent)"
+      : "Earning (before court rent)"
+    : selectedSession?.fee_mode === "fixed"
+      ? "Profit (collected − costs)"
+      : "Total earning";
 
   return (
     <div className="flex flex-col p-4 landscape:h-[calc(100dvh-60px)] landscape:overflow-hidden">
@@ -90,7 +103,23 @@ export default async function SessionsPage(props: PageProps<"/sessions">) {
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-black/40">Details</h3>
                 {selectedSession && <EditSessionButton session={selectedSession} />}
               </div>
-              {selectedSession && (
+              {selectedSession && (isSimple ? (
+                <dl className="mb-6 grid grid-cols-2 gap-x-6 gap-y-4 text-sm landscape:grid-cols-3 landscape:gap-x-8">
+                  <Stat
+                    label={selectedSession.court_fee_type === "total" ? "Court rent (split)" : "Court fee / player"}
+                    value={`₱${selectedSession.court_amount.toFixed(2)}`}
+                  />
+                  <Stat label="Price per game" value={`₱${selectedSession.per_game_fee.toFixed(2)}`} />
+                  <Stat label="Players" value={selectedPlayers.length} />
+                  {selectedSession.court_fee_type === "total" && (
+                    <Stat
+                      label="Court share / player"
+                      value={`₱${(selectedPlayers.length ? selectedSession.court_amount / selectedPlayers.length : 0).toFixed(2)}`}
+                    />
+                  )}
+                  <Stat label="Games played" value={selectedGames.filter((g) => g.status === "Done" || g.status === "Ongoing").length} />
+                </dl>
+                ) : (
                 <dl className="mb-6 grid grid-cols-2 gap-x-6 gap-y-4 text-sm landscape:grid-cols-3 landscape:gap-x-8">
                   <Stat
                     label="Fee mode"
@@ -124,7 +153,7 @@ export default async function SessionsPage(props: PageProps<"/sessions">) {
                     value={`₱${selectedSession.court_share_per_player.toFixed(2)}`}
                   />
                 </dl>
-              )}
+                ))}
               {selectedSession && (
                 <dl className="mb-6 grid grid-cols-2 gap-x-6 gap-y-4 border-t border-black/10 pt-3 text-sm landscape:grid-cols-3 landscape:gap-x-8">
                   <Stat
@@ -139,7 +168,7 @@ export default async function SessionsPage(props: PageProps<"/sessions">) {
                   />
                   <Stat label="Total collected" value={`₱${totalCollected.toFixed(2)}`} emphasize />
                   <Stat
-                    label={selectedSession.fee_mode === "fixed" ? "Profit (collected − costs)" : "Total earning"}
+                    label={earningLabel}
                     value={`₱${totalEarning.toFixed(2)}`}
                     emphasize
                   />
