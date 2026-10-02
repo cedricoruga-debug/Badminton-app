@@ -679,7 +679,8 @@ type UnpaidPlayer = { id: string; name: string; payable: number };
  * your own name and any friends' from a dropdown of the still-unpaid list —
  * amounts stay hidden until a name is picked, then show in the breakdown
  * with the total — and pay via the payment QR) or "Pay the queue master
- * directly" (just an instruction). The queue master still marks people paid
+ * directly" (same name picker and total so they can prepare the amount, but
+ * no QR). The queue master still marks people paid
  * on their side — a paid player just drops off the list on the next
  * refresh. */
 function EndedView({
@@ -788,28 +789,22 @@ function EndedView({
           </div>
         )}
 
-        {!everyonePaid && mode === "master" && (
-          <div className="rounded-2xl bg-white p-5 text-center shadow-soft">
-            <h2 className="text-sm font-semibold">Pay the queue master</h2>
-            <p className="mt-1 text-sm text-black/60">
-              Give your payment to the queue master directly and tell them your name so they can mark you paid.
-            </p>
-            <button type="button" onClick={() => setMode(null)} className="mt-3 text-xs font-medium text-brand hover:underline">
-              Change payment method
-            </button>
-          </div>
-        )}
-
-        {!everyonePaid && mode === "self" && (
+        {!everyonePaid && mode !== null && (
           <>
             <div className="rounded-2xl bg-white p-4 shadow-soft">
               <div className="flex items-center justify-between gap-2">
-                <h2 className="text-sm font-semibold">Pay by myself</h2>
+                <h2 className="text-sm font-semibold">
+                  {mode === "self" ? "Pay by myself" : "Pay the queue master"}
+                </h2>
                 <button type="button" onClick={() => setMode(null)} className="text-xs font-medium text-brand hover:underline">
                   Change
                 </button>
               </div>
-              <p className="mt-0.5 text-xs text-black/50">Choose your name (and your friends&apos;) to see what to pay.</p>
+              <p className="mt-0.5 text-xs text-black/50">
+                {mode === "self"
+                  ? "Choose your name (and your friends') to see what to pay."
+                  : "Choose your name (and your friends') to see what to prepare for the queue master."}
+              </p>
 
               <button
                 type="button"
@@ -886,20 +881,28 @@ function EndedView({
               </div>
             )}
 
-            <div className="rounded-2xl bg-white p-5 text-center shadow-soft">
-              {paymentQrUrl ? (
-                <>
-                  <p className="mb-3 text-sm font-medium text-brand">
-                    {picked.length > 0 ? `Scan to pay ₱${total.toFixed(2)}` : "Scan to pay"}
-                  </p>
-                  {/* eslint-disable-next-line @next/next/no-img-element -- external, user-uploaded QR image of unknown origin */}
-                  <img src={paymentQrUrl} alt="Payment QR code" width={400} height={400} className="mx-auto h-auto w-full max-w-[320px] rounded" />
-                  <p className="mt-3 text-xs text-black/50">After paying, let the queue master know so they can mark you paid.</p>
-                </>
-              ) : (
-                <p className="text-sm text-black/50">No payment QR is set up — please pay the queue master directly.</p>
-              )}
-            </div>
+            {mode === "self" ? (
+              <div className="rounded-2xl bg-white p-5 text-center shadow-soft">
+                {paymentQrUrl ? (
+                  <>
+                    <p className="mb-3 text-sm font-medium text-brand">
+                      {picked.length > 0 ? `Scan to pay ₱${total.toFixed(2)}` : "Scan to pay"}
+                    </p>
+                    {/* eslint-disable-next-line @next/next/no-img-element -- external, user-uploaded QR image of unknown origin */}
+                    <img src={paymentQrUrl} alt="Payment QR code" width={400} height={400} className="mx-auto h-auto w-full max-w-[320px] rounded" />
+                    <p className="mt-3 text-xs text-black/50">After paying, let the queue master know so they can mark you paid.</p>
+                  </>
+                ) : (
+                  <p className="text-sm text-black/50">No payment QR is set up — please pay the queue master directly.</p>
+                )}
+              </div>
+            ) : (
+              <div className="rounded-2xl bg-white p-5 text-center shadow-soft">
+                <p className="text-sm text-black/60">
+                  Hand your payment to the queue master and tell them your name so they can mark you paid.
+                </p>
+              </div>
+            )}
           </>
         )}
       </div>
