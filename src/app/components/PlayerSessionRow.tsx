@@ -96,7 +96,7 @@ function SetRecordRing({
   const winLen = played > 0 ? (wins / played) * c : 0;
   const splitLen = played > 0 ? (splits / played) * c : 0;
   return (
-    <span className="relative flex h-10 w-10 flex-none items-center justify-center">
+    <span className="relative flex h-7 w-7 flex-none items-center justify-center">
       <svg viewBox="0 0 36 36" className="absolute inset-0 h-full w-full -rotate-90" aria-hidden>
         <circle cx="18" cy="18" r={r} fill="none" strokeWidth="3.5" className="stroke-black/[0.07]" />
         {winLen > 0 && (
@@ -108,7 +108,7 @@ function SetRecordRing({
             strokeDasharray={`${splitLen} ${c}`} strokeDashoffset={-winLen} className="stroke-amber-400" />
         )}
       </svg>
-      <span className="relative text-sm font-bold text-brand-dark" title={`${totalGames} games played`}>
+      <span className="relative text-[11px] font-bold text-brand-dark" title={`${totalGames} games played`}>
         {totalGames}
       </span>
     </span>
@@ -172,11 +172,8 @@ export function PlayerSessionRow({
                 open();
               }
             }}
-            className="-mx-2 flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-2.5 transition-colors hover:bg-black/[0.03]"
+            className="-mx-2 flex cursor-pointer flex-col gap-1.5 rounded-lg px-2 py-2.5 transition-colors hover:bg-black/[0.03]"
           >
-            {/* Games played inside a win-rate ring, spanning both lines. */}
-            <SetRecordRing {...setStats} totalGames={ps.total_games} />
-            <div className="flex min-w-0 flex-1 flex-col gap-1">
             {/* Name gets its own full-width line — sharing a row with the
              * status/payment badges below squeezed it down to a couple of
              * characters in a narrow column (the dashboard's Players panel
@@ -184,20 +181,28 @@ export function PlayerSessionRow({
              * number, shares this line — and only once the player is Done,
              * since showing a running total for someone still mid-session
              * (games still being added) reads as presumptuous/greedy. */}
-            <div className="flex min-w-0 items-baseline justify-between gap-2">
-              <p className="min-w-0 truncate font-semibold">{ps.player.name}</p>
-              {ps.done_for_session && <p className="flex-none font-semibold">₱{ps.payable.toFixed(2)}</p>}
+            {/* The name always gets the whole first line, never truncated
+             * away to an initial in a narrow panel. */}
+            <p className="break-words text-base font-bold leading-tight text-brand-dark">{ps.player.name}</p>
+
+            {/* Games played (inside the small win-rate ring) + win %, and the
+             * amount due once they're done. */}
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-1.5">
+                <SetRecordRing {...setStats} totalGames={ps.total_games} />
+                <span className="truncate text-xs font-medium text-black/45">
+                  {setStats.played > 0 ? `${Math.round((setStats.rate ?? 0) * 100)}%` : "—"}
+                </span>
+              </div>
+              {ps.done_for_session && <p className="flex-none text-sm font-semibold">₱{ps.payable.toFixed(2)}</p>}
             </div>
 
             {/* Win rate on the left, Done + payment buttons on the right —
              * wraps onto another line rather than pushing the payment
              * buttons out of view in a narrow panel. Same win-rate math as
              * the dashboard's Today's MVP. */}
-            <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-              <span className="flex-none text-xs font-medium text-black/45">
-                {setStats.played > 0 ? `${Math.round((setStats.rate ?? 0) * 100)}% win` : "No results yet"}
-              </span>
-              <div className="ml-auto flex flex-none items-center gap-1.5">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <div className="contents">
                 <button
                   type="button"
                   disabled={isPending}
@@ -282,7 +287,6 @@ export function PlayerSessionRow({
                  * the popup (click the player) via "Remove from session"
                  * below. */}
               </div>
-            </div>
             </div>
           </div>
         )}
