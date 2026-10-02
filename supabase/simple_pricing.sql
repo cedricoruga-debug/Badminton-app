@@ -31,6 +31,7 @@ alter table clubs add column if not exists round_up_buffer boolean not null defa
 alter table player_sessions add column if not exists use_buffer boolean not null default true;
 alter table player_sessions alter column payable set expression as (
   case
+    when discount_percent >= 100 then 0  -- a 100% discount means free, no +₱10
     when fixed_fee is not null then ceil(fixed_fee * (1 - discount_percent / 100.0))
     when (court_share + shuttle_share + surcharge_amount) = 0 then 0
     when use_buffer then ceil(((court_share + shuttle_share) * (1 - discount_percent / 100.0) + surcharge_amount) / 10.0) * 10 + 10

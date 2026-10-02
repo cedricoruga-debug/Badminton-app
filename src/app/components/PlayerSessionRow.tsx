@@ -76,6 +76,45 @@ function SetRecordBar({
   );
 }
 
+/** Small donut showing the set record — wins (emerald) then splits
+ * (amber) around the ring, the rest faint — with the games-played count in
+ * the middle. Replaces the old slim bar in the compact row, which together
+ * with the Done and payment buttons overflowed narrow panels. */
+function SetRecordRing({
+  wins,
+  splits,
+  played,
+  totalGames,
+}: {
+  wins: number;
+  splits: number;
+  played: number;
+  totalGames: number;
+}) {
+  const r = 15;
+  const c = 2 * Math.PI * r;
+  const winLen = played > 0 ? (wins / played) * c : 0;
+  const splitLen = played > 0 ? (splits / played) * c : 0;
+  return (
+    <span className="relative flex h-10 w-10 flex-none items-center justify-center">
+      <svg viewBox="0 0 36 36" className="absolute inset-0 h-full w-full -rotate-90" aria-hidden>
+        <circle cx="18" cy="18" r={r} fill="none" strokeWidth="3.5" className="stroke-black/[0.07]" />
+        {winLen > 0 && (
+          <circle cx="18" cy="18" r={r} fill="none" strokeWidth="3.5" strokeLinecap="butt"
+            strokeDasharray={`${winLen} ${c}`} className="stroke-emerald-500" />
+        )}
+        {splitLen > 0 && (
+          <circle cx="18" cy="18" r={r} fill="none" strokeWidth="3.5" strokeLinecap="butt"
+            strokeDasharray={`${splitLen} ${c}`} strokeDashoffset={-winLen} className="stroke-amber-400" />
+        )}
+      </svg>
+      <span className="relative text-sm font-bold text-brand-dark" title={`${totalGames} games played`}>
+        {totalGames}
+      </span>
+    </span>
+  );
+}
+
 /**
  * A player's row for a session — clickable to open a popup with their full
  * details: games played, payment status and actions, and the list of games
@@ -133,8 +172,11 @@ export function PlayerSessionRow({
                 open();
               }
             }}
-            className="-mx-2 flex cursor-pointer flex-col gap-1.5 rounded-lg px-2 py-3 transition-colors hover:bg-black/[0.03]"
+            className="-mx-2 flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-2.5 transition-colors hover:bg-black/[0.03]"
           >
+            {/* Games played inside a win-rate ring, spanning both lines. */}
+            <SetRecordRing {...setStats} totalGames={ps.total_games} />
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
             {/* Name gets its own full-width line — sharing a row with the
              * status/payment badges below squeezed it down to a couple of
              * characters in a narrow column (the dashboard's Players panel
@@ -147,23 +189,15 @@ export function PlayerSessionRow({
               {ps.done_for_session && <p className="flex-none font-semibold">₱{ps.payable.toFixed(2)}</p>}
             </div>
 
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex flex-none items-center gap-1.5">
-                <span className="text-sm text-black/50">{ps.total_games}</span>
-                {/* Set record accent — a narrow (roughly a third of the old
-                 * full-width bar) won/split/lost bar plus win rate, right on
-                 * the games-played line instead of a line of its own. Same
-                 * win-rate math as the dashboard's Today's MVP. */}
-                {setStats.played > 0 && (
-                  <>
-                    <SetRecordBar {...setStats} widthClassName="w-8" />
-                    <span className="text-[10px] font-medium text-black/40">
-                      {Math.round((setStats.rate ?? 0) * 100)}%
-                    </span>
-                  </>
-                )}
-              </div>
-              <div className="flex min-w-0 items-center gap-2">
+            {/* Win rate on the left, Done + payment buttons on the right —
+             * wraps onto another line rather than pushing the payment
+             * buttons out of view in a narrow panel. Same win-rate math as
+             * the dashboard's Today's MVP. */}
+            <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+              <span className="flex-none text-xs font-medium text-black/45">
+                {setStats.played > 0 ? `${Math.round((setStats.rate ?? 0) * 100)}% win` : "No results yet"}
+              </span>
+              <div className="ml-auto flex flex-none items-center gap-1.5">
                 <button
                   type="button"
                   disabled={isPending}
@@ -248,6 +282,7 @@ export function PlayerSessionRow({
                  * the popup (click the player) via "Remove from session"
                  * below. */}
               </div>
+            </div>
             </div>
           </div>
         )}
