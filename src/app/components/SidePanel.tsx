@@ -2,14 +2,16 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { IconCalendar, IconHome, IconKey, IconLogout } from "@/app/components/icons";
+import { IconCalendar, IconHome, IconKey, IconLogout, IconTrophy } from "@/app/components/icons";
 import { SettingsButton } from "@/app/components/SettingsButton";
+import { clearLocalCache } from "@/lib/localCache";
 import { createClient } from "@/lib/supabase/client";
 import type { AppSettings } from "@/lib/types";
 
 const LINKS = [
   { href: "/", label: "Home", icon: IconHome },
   { href: "/sessions", label: "Sessions", icon: IconCalendar },
+  { href: "/leaderboard", label: "Leaderboard", icon: IconTrophy },
 ];
 
 /**
@@ -28,6 +30,8 @@ export function SidePanel({ settings, isAdmin }: { settings: AppSettings | null;
   async function handleLogout() {
     const supabase = createClient();
     await supabase.auth.signOut();
+    // The next person to sign in here may be from another club.
+    await clearLocalCache().catch(() => {});
     router.push("/login");
     router.refresh();
   }

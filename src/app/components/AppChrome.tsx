@@ -2,18 +2,19 @@
 
 import { useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { IconShuttle } from "@/app/components/icons";
+import { ClubProvider } from "@/app/components/ClubContext";
+import { IconSport } from "@/app/components/icons";
 import { OfflineBanner } from "@/app/components/OfflineBanner";
 import { SidePanel } from "@/app/components/SidePanel";
 import { registerServiceWorker } from "@/lib/registerSW";
 import { createClient } from "@/lib/supabase/client";
 import type { AppSettings } from "@/lib/types";
 
-const APP_TITLE = "KRO5 Badminton";
+import { BRAND, sportCopy } from "@/lib/sport";
 
 /** Every table a page on this site reads from — a change to any of them
  * could be showing on someone else's screen right now. */
-const WATCHED_TABLES = ["players", "sessions", "games", "player_sessions", "app_settings"] as const;
+const WATCHED_TABLES = ["players", "sessions", "games", "player_sessions", "clubs"] as const;
 
 /** If several rows change at once (e.g. saving a game touches both `games`
  * and `player_sessions`), coalesce them into one refresh instead of one per
@@ -135,7 +136,7 @@ function useLiveRefresh(enabled: boolean) {
  * its own centered card layout, and a visitor there either isn't signed in
  * yet (`/login`) or never will be (`/join`, the public queue-viewing page),
  * so the nav links to pages they can't use would just be confusing. */
-const CHROMELESS_PATHS = ["/login", "/join", "/welcome"];
+const CHROMELESS_PATHS = ["/login", "/join", "/welcome", "/signup", "/forgot-password", "/reset-password"];
 
 /**
  * Wraps every page with the header + right-hand icon rail — except the
@@ -175,10 +176,11 @@ export function AppChrome({
   useLiveRefresh(!isChromeless);
 
   if (isChromeless) {
-    return <>{children}</>;
+    return <ClubProvider club={settings}>{children}</ClubProvider>;
   }
 
   return (
+    <ClubProvider club={settings}>
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-50 flex items-center gap-3 bg-brand px-4 py-3 text-white shadow-[0_2px_14px_rgba(54,201,143,0.3)]">
         <span className="flex h-8 w-8 flex-none items-center justify-center overflow-hidden rounded-full bg-white/15">
@@ -186,10 +188,20 @@ export function AppChrome({
             // eslint-disable-next-line @next/next/no-img-element -- user-uploaded image of unknown origin
             <img src={settings.app_icon_url} alt="" className="h-full w-full object-cover" />
           ) : (
-            <IconShuttle className="h-5 w-5" />
+            <IconSport sport={settings?.sport} className="h-5 w-5" />
           )}
         </span>
-        <h1 className="text-lg font-semibold">{APP_TITLE}</h1>
+        <h1 className="flex min-w-0 items-baseline gap-2 text-lg font-semibold">
+          <span className="font-extrabold tracking-tight">{BRAND}</span>
+          {settings?.name && (
+            <span className="truncate font-semibold text-white/85">· {settings.name}</span>
+          )}
+        </h1>
+        {settings && (
+          <span className="ml-auto flex-none rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-semibold">
+            {sportCopy(settings.sport).label}
+          </span>
+        )}
       </header>
       <div className="sticky top-[60px] z-40">
         <OfflineBanner />
@@ -201,5 +213,6 @@ export function AppChrome({
         <SidePanel settings={settings} isAdmin={isAdmin} />
       </div>
     </div>
+    </ClubProvider>
   );
 }

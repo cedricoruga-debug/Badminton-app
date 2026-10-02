@@ -5,6 +5,7 @@ import {
   IconFlag,
   IconPeso,
   IconPhone,
+  IconPickleball,
   IconRacket,
   IconSearch,
   IconShuttle,
@@ -23,18 +24,21 @@ import {
  * support, live sync across devices). If a feature is removed, update the
  * copy here.
  *
+ * Any queue master can create their own club from /signup (badminton or
+ * pickleball) — that's the main call to action.
+ *
  * Optional: set NEXT_PUBLIC_CONTACT_EMAIL to show a "Get KRO5 for your
  * group" contact button. Left unset, that button is simply not rendered.
  */
 
 export const metadata: Metadata = {
-  title: "KRO5 Badminton — fun, simple badminton queuing",
+  title: "KRO5 — badminton & pickleball queuing for queue masters",
   description:
-    "Run your badminton night without the chaos. Queue games, track courts live, split fees automatically and collect payments — built for queue masters and players.",
+    "Run your badminton or pickleball night without the chaos. Queue games, track courts live, split fees or charge a flat rate, collect payments, and crown a leaderboard.",
   openGraph: {
-    title: "KRO5 Badminton — queue smarter, play more",
+    title: "KRO5 — queue smarter, play more",
     description:
-      "Fun, simple badminton queuing for queue masters and badminton enthusiasts. Live queue, automatic fees, easy payments.",
+      "Fun, simple queuing for badminton and pickleball queue masters and players. Live queue, up-next alerts, automatic fees, easy payments.",
     type: "website",
   },
 };
@@ -47,6 +51,7 @@ export default function WelcomePage() {
       <SiteNav />
       <Hero />
       <TrustStrip />
+      <Sports />
       <HowItWorks />
       <Features />
       <TwoSides />
@@ -68,8 +73,9 @@ function Logo({ light = false }: { light?: boolean }) {
       >
         <IconShuttle className="h-5 w-5" />
       </span>
-      <span className={`text-lg font-extrabold tracking-tight ${light ? "text-white" : "text-brand-dark"}`}>
-        KRO5 <span className="font-semibold opacity-70">Badminton</span>
+      <span className={`flex flex-col leading-none ${light ? "text-white" : "text-brand-dark"}`}>
+        <span className="text-lg font-extrabold tracking-tight">KRO5</span>
+        <span className="mt-0.5 text-[10px] font-bold uppercase tracking-widest opacity-60">Badminton · Pickleball</span>
       </span>
     </span>
   );
@@ -79,10 +85,11 @@ function SiteNav() {
   return (
     <header className="sticky top-0 z-50 border-b border-brand-dark/5 bg-background/85 backdrop-blur">
       <nav className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
-        <Link href="/" aria-label="KRO5 Badminton home">
+        <Link href="/" aria-label="KRO5 home">
           <Logo />
         </Link>
         <div className="hidden items-center gap-7 text-sm font-semibold text-brand-dark/70 md:flex">
+          <a href="#sports" className="hover:text-brand-dark">Sports</a>
           <a href="#how" className="hover:text-brand-dark">How it works</a>
           <a href="#features" className="hover:text-brand-dark">Features</a>
           <a href="#players" className="hover:text-brand-dark">For players</a>
@@ -94,8 +101,14 @@ function SiteNav() {
           >
             Join a game
           </Link>
-          <Link href="/login" className="btn-brand rounded-full px-5 py-2 text-sm font-bold">
+          <Link
+            href="/login"
+            className="rounded-full px-4 py-2 text-sm font-semibold text-brand-dark hover:bg-brand-light"
+          >
             Sign in
+          </Link>
+          <Link href="/signup" className="btn-brand rounded-full px-5 py-2 text-sm font-bold">
+            Create club
           </Link>
         </div>
       </nav>
@@ -117,7 +130,8 @@ function Hero() {
         <div className="text-white">
           <p className="mb-5 inline-flex items-center gap-2 rounded-full bg-white/15 px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider ring-1 ring-white/25">
             <IconShuttle className="h-3.5 w-3.5" />
-            Built for queue masters &amp; badminton lovers
+            <IconPickleball className="h-3.5 w-3.5" />
+            For badminton &amp; pickleball queue masters
           </p>
           <h1 className="text-5xl font-extrabold leading-[1.02] tracking-tight sm:text-6xl lg:text-7xl">
             Queue smarter.
@@ -125,15 +139,15 @@ function Hero() {
             <span className="text-brand-dark">Play more.</span>
           </h1>
           <p className="mt-6 max-w-xl text-lg font-medium leading-relaxed text-white/90 sm:text-xl">
-            Ditch the notebook and the group-chat chaos. KRO5 runs your badminton night — who&apos;s up next, which
-            court is live, who owes what — right from your phone.
+            Ditch the notebook, the paddle stack and the group-chat chaos. KRO5 runs your badminton or pickleball
+            night — who&apos;s up next, which court is live, who owes what — right from your phone.
           </p>
           <div className="mt-9 flex flex-wrap items-center gap-3">
             <Link
-              href="/login"
+              href="/signup"
               className="rounded-full bg-brand-dark px-7 py-3.5 text-base font-bold text-white shadow-[0_10px_24px_-8px_rgba(23,42,35,0.7)] transition hover:bg-accent-dark"
             >
-              Start your session
+              Create your club — free
             </Link>
             <Link
               href="/join"
@@ -146,6 +160,7 @@ function Hero() {
             <li className="flex items-center gap-1.5"><Check /> Works on any phone</li>
             <li className="flex items-center gap-1.5"><Check /> Nothing to install</li>
             <li className="flex items-center gap-1.5"><Check /> Keeps working offline</li>
+            <li className="flex items-center gap-1.5"><Check /> Free to start</li>
           </ul>
         </div>
 
@@ -183,6 +198,12 @@ function HeroPhone() {
         className="float-slower absolute right-1 bottom-24 z-10 flex h-12 w-12 items-center justify-center rounded-full bg-[#ffd166] text-brand-dark shadow-xl [--r:8deg] sm:-right-8"
       >
         <IconTrophy className="h-6 w-6" />
+      </span>
+      <span
+        aria-hidden
+        className="float-slower absolute -right-1 top-6 z-10 flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-500 text-white shadow-xl [--r:-6deg] sm:-right-6"
+      >
+        <IconPickleball className="h-7 w-7" />
       </span>
 
       <div className="rounded-[2.6rem] bg-brand-dark p-2.5 shadow-[0_40px_80px_-24px_rgba(23,42,35,0.75)] ring-1 ring-white/20">
@@ -273,8 +294,8 @@ function QueueRow({ n, a, b, tag, hot = false }: { n: number; a: string; b: stri
 function TrustStrip() {
   const items = [
     { k: "Live", v: "queue that updates on every phone" },
-    { k: "Auto", v: "court & shuttle fee split" },
-    { k: "1 tap", v: "to record a winner" },
+    { k: "Auto", v: "fee split — or a flat rate" },
+    { k: "Buzz", v: "when it's your turn" },
     { k: "0", v: "apps to download" },
   ];
   return (
@@ -287,6 +308,60 @@ function TrustStrip() {
           </div>
         ))}
       </dl>
+    </section>
+  );
+}
+
+/* ───────────────────────────── Sports ───────────────────────────── */
+
+function Sports() {
+  const sports = [
+    {
+      icon: <IconShuttle className="h-7 w-7" />,
+      name: "Badminton",
+      tint: "bg-emerald-600",
+      points: [
+        "Doubles queue with Magic Queue suggestions",
+        "Shuttle cost split by games actually played",
+        "Rally scoring to 21, tap-to-crown winners",
+      ],
+    },
+    {
+      icon: <IconPickleball className="h-7 w-7" />,
+      name: "Pickleball",
+      tint: "bg-sky-600",
+      points: [
+        "Open-play queue that replaces the paddle stack",
+        "Flat open-play rate, or split court + balls per session",
+        "Games to 11, live courts with the kitchen drawn in",
+      ],
+    },
+  ];
+  return (
+    <section id="sports" className="mx-auto max-w-6xl scroll-mt-20 px-4 pt-14 sm:px-6">
+      <SectionHead
+        eyebrow="Your sport, your way"
+        title="Made for badminton halls and pickleball courts."
+        sub="Pick your sport when you create your club — the wording, scoring, court view and fees all follow."
+      />
+      <div className="mt-10 grid gap-5 md:grid-cols-2">
+        {sports.map((sp) => (
+          <article key={sp.name} className="overflow-hidden rounded-3xl bg-white shadow-soft ring-1 ring-brand-dark/5">
+            <div className={`flex items-center gap-3 px-7 py-5 text-white ${sp.tint}`}>
+              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/20">{sp.icon}</span>
+              <h3 className="text-2xl font-extrabold">{sp.name}</h3>
+            </div>
+            <ul className="space-y-3 px-7 py-6 font-medium text-brand-dark/75">
+              {sp.points.map((t) => (
+                <li key={t} className="flex gap-3">
+                  <CheckGreen />
+                  {t}
+                </li>
+              ))}
+            </ul>
+          </article>
+        ))}
+      </div>
     </section>
   );
 }
@@ -308,7 +383,7 @@ function HowItWorks() {
     {
       icon: <IconCalendar className="h-6 w-6" />,
       title: "Open a session",
-      body: "Set the court hours and shuttle cost once. Add whoever showed up — new faces take seconds.",
+      body: "Set the court hours and shuttle or ball cost — or just a flat fee. Add whoever showed up; new faces take seconds.",
     },
     {
       icon: <IconRacket className="h-6 w-6" />,
@@ -357,7 +432,7 @@ function Features() {
     {
       icon: <IconPeso className="h-6 w-6" />,
       title: "Automatic fee split",
-      body: "Court time and shuttles are split by games played, rounded to a friendly amount. No calculator, no spreadsheet.",
+      body: "Split court time and shuttles or balls fairly — or charge everyone a fixed open-play rate and see your real profit. No calculator, no spreadsheet.",
     },
     {
       icon: <IconPhone className="h-6 w-6" />,
@@ -366,8 +441,13 @@ function Features() {
     },
     {
       icon: <IconTrophy className="h-6 w-6" />,
-      title: "Bragging rights",
-      body: "Every session crowns a Today's MVP by win rate, and each player has a history you can look back on.",
+      title: "Leaderboards & bragging rights",
+      body: "Wins, win rate and hot streaks for your whole club — by session, last 30 days or all time. Plus a Today's MVP every session.",
+    },
+    {
+      icon: <IconSearch className="h-6 w-6" />,
+      title: "“You're up next!” alerts",
+      body: "Players pick their name on the live queue page and their phone buzzes when their game is next. No more shouting names across the hall.",
     },
     {
       icon: <IconShuttle className="h-6 w-6" />,
@@ -380,8 +460,8 @@ function Features() {
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <SectionHead
           eyebrow="Features"
-          title="Everything a badminton night needs. Nothing it doesn't."
-          sub="Simple enough to use between games, with your racket still in the other hand."
+          title="Everything a game night needs. Nothing it doesn't."
+          sub="Simple enough to use between games, with your racket or paddle still in the other hand."
         />
         <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {feats.map((f) => (
@@ -414,7 +494,8 @@ function TwoSides() {
           <h3 className="mt-4 text-2xl font-extrabold sm:text-3xl">Run the whole night from one screen.</h3>
           <ul className="mt-6 space-y-3 font-medium text-white/85">
             {[
-              "Create sessions and add players in seconds",
+              "Create sessions and add a whole roster in seconds",
+              "Split costs or charge a fixed rate per player",
               "Queue games and move them onto live courts",
               "Record winners with a single tap",
               "See exactly who owes what — and collect it",
@@ -423,8 +504,8 @@ function TwoSides() {
               <li key={t} className="flex gap-3"><CheckDark />{t}</li>
             ))}
           </ul>
-          <Link href="/login" className="mt-8 inline-block rounded-full bg-brand px-6 py-3 font-bold text-white transition hover:bg-white hover:text-brand-dark">
-            Sign in to your club
+          <Link href="/signup" className="mt-8 inline-block rounded-full bg-brand px-6 py-3 font-bold text-white transition hover:bg-white hover:text-brand-dark">
+            Create your club
           </Link>
         </div>
 
@@ -435,7 +516,8 @@ function TwoSides() {
             {[
               "Scan the session QR or enter the 6-digit code",
               "Watch the live queue and see what's on court",
-              "Request a set right from your phone",
+              "Get buzzed when you're up next",
+              "Request a game right from your phone",
               "No account and no app to install",
             ].map((t) => (
               <li key={t} className="flex gap-3"><CheckGreen />{t}</li>
@@ -476,18 +558,18 @@ function FinalCta() {
         <div aria-hidden className="court-lines absolute inset-0 -z-10 opacity-60" />
         <IconShuttle className="float-slow mx-auto h-12 w-12 [--r:-8deg]" />
         <h2 className="mx-auto mt-5 max-w-2xl text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl">
-          Ready for your smoothest Saturday yet?
+          Ready for your smoothest game night yet?
         </h2>
         <p className="mx-auto mt-4 max-w-xl text-lg font-medium text-white/90">
           Less shouting across the court. More rallies.
         </p>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
-          <Link href="/login" className="rounded-full bg-brand-dark px-8 py-3.5 text-base font-bold text-white transition hover:bg-accent-dark">
-            Sign in
+          <Link href="/signup" className="rounded-full bg-brand-dark px-8 py-3.5 text-base font-bold text-white transition hover:bg-accent-dark">
+            Create your club
           </Link>
           {CONTACT_EMAIL ? (
             <a
-              href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent("KRO5 Badminton for my group")}`}
+              href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent("KRO5 for my group")}`}
               className="rounded-full bg-white px-8 py-3.5 text-base font-bold text-brand-dark transition hover:bg-brand-light"
             >
               Get KRO5 for your group
@@ -511,8 +593,9 @@ function Footer() {
         <nav className="flex gap-6 font-semibold">
           <Link href="/join" className="hover:text-brand-dark">Join a game</Link>
           <Link href="/login" className="hover:text-brand-dark">Sign in</Link>
+          <Link href="/signup" className="hover:text-brand-dark">Create club</Link>
         </nav>
-        <p>© {new Date().getFullYear()} KRO5 Badminton</p>
+        <p>© {new Date().getFullYear()} KRO5</p>
       </div>
     </footer>
   );

@@ -2,7 +2,8 @@ import Link from "next/link";
 import { AddPlayerButton } from "@/app/components/AddPlayerButton";
 import { EditSessionButton } from "@/app/components/EditSessionButton";
 import { PlayerSessionRow } from "@/app/components/PlayerSessionRow";
-import { getAllSessions, getGames, getPlayerSessions } from "@/lib/queries";
+import { getAllSessions, getAppSettings, getGames, getPlayerSessions } from "@/lib/queries";
+import { sportCopy } from "@/lib/sport";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,9 @@ export default async function SessionsPage(props: PageProps<"/sessions">) {
   const searchParams = await props.searchParams;
   const requestedSession = typeof searchParams.session === "string" ? searchParams.session : undefined;
 
-  const sessions = await getAllSessions();
+  const [sessions, club] = await Promise.all([getAllSessions(), getAppSettings()]);
+  const copy = sportCopy(club?.sport);
+  const isPickleball = club?.sport === "pickleball";
 
   const selectedSessionId =
     requestedSession && sessions.some((s) => s.id === requestedSession) ? requestedSession : sessions[0]?.id;
@@ -89,12 +92,32 @@ export default async function SessionsPage(props: PageProps<"/sessions">) {
               </div>
               {selectedSession && (
                 <dl className="mb-6 grid grid-cols-2 gap-x-6 gap-y-4 text-sm landscape:grid-cols-3 landscape:gap-x-8">
+                  <Stat
+                    label="Fee mode"
+                    value={
+                      selectedSession.fee_mode === "fixed"
+                        ? `Fixed ₱${Number(selectedSession.fixed_fee).toFixed(0)} / player`
+                        : "Split costs"
+                    }
+                  />
                   <Stat label="Hours" value={selectedSession.hours} />
                   <Stat label="Fee / hour" value={`₱${selectedSession.fee_per_hour.toFixed(2)}`} />
                   <Stat label="Court fee" value={`₱${selectedSession.court_fee.toFixed(2)}`} />
-                  <Stat label="Shuttle tube cost" value={`₱${selectedSession.shuttle_tube_cost.toFixed(2)}`} />
-                  <Stat label="Cost / shuttle" value={`₱${selectedSession.cost_per_shuttle.toFixed(2)}`} />
-                  <Stat label="Shuttle fee / game" value={`₱${selectedSession.shuttle_fee_per_game.toFixed(2)}`} />
+                  <Stat label={copy.costLabel} value={`₱${selectedSession.shuttle_tube_cost.toFixed(2)}`} />
+                  {isPickleball ? (
+                    <Stat
+                      label="Ball share / player"
+                      value={`₱${(selectedSession.player_count > 0
+                        ? selectedSession.shuttle_tube_cost / selectedSession.player_count
+                        : 0
+                      ).toFixed(2)}`}
+                    />
+                  ) : (
+                    <>
+                      <Stat label="Cost / shuttle" value={`₱${selectedSession.cost_per_shuttle.toFixed(2)}`} />
+                      <Stat label="Shuttle fee / game" value={`₱${selectedSession.shuttle_fee_per_game.toFixed(2)}`} />
+                    </>
+                  )}
                   <Stat label="Players" value={selectedSession.player_count} />
                   <Stat
                     label="Court share / player"
@@ -115,7 +138,11 @@ export default async function SessionsPage(props: PageProps<"/sessions">) {
                     emphasize
                   />
                   <Stat label="Total collected" value={`₱${totalCollected.toFixed(2)}`} emphasize />
-                  <Stat label="Total earning" value={`₱${totalEarning.toFixed(2)}`} emphasize />
+                  <Stat
+                    label={selectedSession.fee_mode === "fixed" ? "Profit (collected − costs)" : "Total earning"}
+                    value={`₱${totalEarning.toFixed(2)}`}
+                    emphasize
+                  />
                   <Stat
                     label="Collected via GCash"
                     value={`₱${collectedGcash.toFixed(2)}`}

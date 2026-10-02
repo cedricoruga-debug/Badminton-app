@@ -4,21 +4,17 @@ import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { IconShuttle } from "@/app/components/icons";
+import { IconPickleball, IconShuttle } from "@/app/components/icons";
 
 /**
- * Sign-in page — the one route `proxy.ts` always lets through. No public
- * sign-up here on purpose: accounts are created directly in the Supabase
- * dashboard (Authentication → Users) so the app stays closed to whoever
- * finds the link, rather than letting anyone self-register.
- *
- * Supabase Auth only knows "email", not "username" — so under the hood
- * each account's real login email is `<username>@badminton.local` (a fake
- * domain that never sends or receives real mail; Auto Confirm skips the
- * verification step). This page just asks for the username and appends
- * that domain before calling Supabase, so from the user's side it's a
- * plain username + password login. See DEPLOY.md for how to create
- * accounts with this convention.
+ * Sign-in page. Two kinds of login share one field:
+ *  - club owners sign in with the real email they signed up with;
+ *  - staff accounts (added from the Accounts page) sign in with a plain
+ *    username — under the hood that's `<username>@badminton.local`, since
+ *    Supabase Auth only knows "email" (a fake domain that never sends or
+ *    receives mail).
+ * Anything containing "@" is treated as an email, anything else as a
+ * username.
  */
 const USERNAME_DOMAIN = "@badminton.local";
 
@@ -34,14 +30,15 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
 
-    const email = username.trim().toLowerCase() + USERNAME_DOMAIN;
+    const login = username.trim().toLowerCase();
+    const email = login.includes("@") ? login : login + USERNAME_DOMAIN;
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithPassword({ email, password });
 
     setLoading(false);
     if (error) {
       setError(
-        error.message === "Invalid login credentials" ? "Wrong username or password." : error.message
+        error.message === "Invalid login credentials" ? "Wrong email/username or password." : error.message
       );
       return;
     }
@@ -57,14 +54,15 @@ export default function LoginPage() {
         <Link
           href="/"
           className="mb-5 flex items-center justify-center gap-2 text-white"
-          aria-label="KRO5 Badminton home"
+          aria-label="KRO5 home"
         >
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20">
             <IconShuttle className="h-6 w-6" />
           </span>
-          <span className="text-xl font-extrabold tracking-tight">
-            KRO5 <span className="font-semibold opacity-80">Badminton</span>
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20">
+            <IconPickleball className="h-6 w-6" />
           </span>
+          <span className="text-xl font-extrabold tracking-tight">KRO5</span>
         </Link>
 
         <div className="rounded-3xl bg-white p-7 shadow-[0_30px_60px_-20px_rgba(23,42,35,0.6)]">
@@ -73,7 +71,7 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="mb-1 block text-sm font-semibold text-brand-dark">Username</label>
+              <label className="mb-1 block text-sm font-semibold text-brand-dark">Email or username</label>
               <input
                 type="text"
                 required
@@ -87,7 +85,12 @@ export default function LoginPage() {
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-semibold text-brand-dark">Password</label>
+              <div className="mb-1 flex items-baseline justify-between">
+                <label className="block text-sm font-semibold text-brand-dark">Password</label>
+                <Link href="/forgot-password" className="text-xs font-semibold text-brand hover:underline">
+                  Forgot password?
+                </Link>
+              </div>
               <input
                 type="password"
                 required
@@ -111,6 +114,12 @@ export default function LoginPage() {
         </div>
 
         <p className="mt-5 text-center text-sm font-semibold text-white/90">
+          New queue master?{" "}
+          <Link href="/signup" className="underline underline-offset-2 hover:text-white">
+            Create your club
+          </Link>
+        </p>
+        <p className="mt-2 text-center text-sm font-semibold text-white/90">
           Just here to play?{" "}
           <Link href="/join" className="underline underline-offset-2 hover:text-white">
             See the live queue

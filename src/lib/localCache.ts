@@ -31,7 +31,9 @@ import type { GameWithPlayers, SessionOption } from "@/lib/queries";
 import type { AppSettings, Game, Player, PlayerSession, PlayerSessionWithPlayer, Session } from "@/lib/types";
 
 const DB_NAME = "badminton-dashboard-cache";
-const DB_VERSION = 1;
+// v2: app_settings now holds the club row (string uuid key) instead of the
+// old single-row settings keyed by the number 1.
+const DB_VERSION = 2;
 
 interface DashboardDB extends DBSchema {
   /** Every session as a picker option (id + date); the active session's row
@@ -41,7 +43,7 @@ interface DashboardDB extends DBSchema {
   games: { key: string; value: Game; indexes: { session_id: string } };
   players: { key: string; value: Player };
   player_sessions: { key: string; value: PlayerSession; indexes: { session_id: string } };
-  app_settings: { key: number; value: AppSettings };
+  app_settings: { key: string; value: AppSettings };
   /** Small out-of-line key/value bucket for bookkeeping — which session is
    * "active" right now, and when the cache was last refreshed from the
    * server. Not a real table. */
@@ -83,6 +85,7 @@ function toBarePlayerSession(ps: PlayerSessionWithPlayer): PlayerSession {
     shuttle_share: ps.shuttle_share,
     discount_percent: ps.discount_percent,
     surcharge_amount: ps.surcharge_amount,
+    fixed_fee: ps.fixed_fee,
     payable: ps.payable,
     payment_method: ps.payment_method,
     done_for_session: ps.done_for_session,
@@ -96,7 +99,12 @@ function getDB(): Promise<IDBPDatabase<DashboardDB>> | null {
   if (typeof indexedDB === "undefined") return null; // SSR / unsupported browser
   if (!dbPromise) {
     dbPromise = openDB<DashboardDB>(DB_NAME, DB_VERSION, {
-      upgrade(db) {
+      upgrade(db, oldVersion) {
+        // Simplest safe upgrade for a cache: drop everything and rebuild —
+        // it's re-seeded from the server on the next online load anyway.
+        if (oldVersion > 0) {
+          for (const name of Array.from(db.objectStoreNames)) db.deleteObjectStore(name);
+        }
         db.createObjectStore("sessions", { keyPath: "id" });
         const games = db.createObjectStore("games", { keyPath: "id" });
         games.createIndex("session_id", "session_id");
@@ -138,6 +146,18 @@ export async function seedFromServer(data: DashboardData): Promise<void> {
     "readwrite"
   );
 
+  // A different club signed in on this device (or the first seed since the
+  // app went multi-tenant) — wipe the previous club's cached data first so
+  // it can never show up under the new one.
+  const cachedClubId = await tx.objectStore("meta").get("clubId");
+  const clubId = data.settings?.id ?? null;
+  if (cachedClubId !== clubId) {
+    for (const store of ["sessions", "games", "players", "player_sessions", "app_settings"] as const) {
+      await tx.objectStore(store).clear();
+    }
+    await tx.objectStore("meta").put(clubId, "clubId");
+  }
+
   const sessionsStore = tx.objectStore("sessions");
   await sessionsStore.clear();
   for (const s of data.sessions) await sessionsStore.put(s);
@@ -145,7 +165,10 @@ export async function seedFromServer(data: DashboardData): Promise<void> {
   // offline load can rebuild it (hours, fees, join code…) from this store.
   if (data.session) await sessionsStore.put(data.session);
 
-  if (data.settings) await tx.objectStore("app_settings").put(data.settings);
+  if (data.settings) {
+    await tx.objectStore("app_settings").clear();
+    await tx.objectStore("app_settings").put(data.settings);
+  }
 
   // Every player referenced anywhere in this payload, deduped — upsert
   // rather than clear-and-replace, since players from a previous session
@@ -197,7 +220,7 @@ export async function loadActiveDashboardData(): Promise<DashboardData | null> {
   const lastSyncedAt = await db.get("meta", "lastSyncedAt");
   if (lastSyncedAt == null) return null;
 
-  const settings = (await db.get("app_settings", 1)) ?? null;
+  const settings = (await db.getAll("app_settings"))[0] ?? null;
 
   const storedSessions = await db.getAll("sessions");
   storedSessions.sort((a, b) => (a.session_date < b.session_date ? 1 : a.session_date > b.session_date ? -1 : 0));
@@ -243,4 +266,19 @@ export async function getLastSyncedAt(): Promise<number | null> {
   if (!db) return null;
   const value = await db.get("meta", "lastSyncedAt");
   return typeof value === "number" ? value : null;
+}
+
+/** Wipes the whole cache — called on sign-out, so the next person to sign
+ * in on this device (possibly from another club) never sees this data. */
+export async function clearLocalCache(): Promise<void> {
+  const db = await getDB();
+  if (!db) return;
+  const tx = db.transaction(
+    ["sessions", "games", "players", "player_sessions", "app_settings", "meta"],
+    "readwrite"
+  );
+  for (const store of ["sessions", "games", "players", "player_sessions", "app_settings", "meta"] as const) {
+    await tx.objectStore(store).clear();
+  }
+  await tx.done;
 }

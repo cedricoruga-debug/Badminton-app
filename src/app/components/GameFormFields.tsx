@@ -3,6 +3,7 @@
 import { useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { deleteGame } from "@/app/actions";
+import { useSport } from "@/app/components/ClubContext";
 import { Matchup } from "@/app/components/Matchup";
 import { PlayerHistoryPanel } from "@/app/components/PlayerHistoryPanel";
 import { SubmitButton } from "@/app/components/SubmitButton";
@@ -274,6 +275,8 @@ export function GameFormFields({
     while (padded.length < 4) padded.push(null);
     return padded.slice(0, 4);
   });
+  const { copy } = useSport();
+  const sportCopyText = `${copy.label}: ${copy.scoreHint}`;
   const [status, setStatus] = useState(defaultStatus);
   const [winnerTeam, setWinnerTeam] = useState(defaultWinnerTeam);
   // Which of Suggest's (up to SUGGESTION_SET_COUNT) candidate foursomes to
@@ -481,6 +484,7 @@ export function GameFormFields({
               className="w-full min-w-0 rounded border border-black/15 px-2 py-1.5 text-sm"
             />
           </div>
+          <p className="mt-1 text-[11px] text-black/40">{sportCopyText}</p>
         </fieldset>
       )}
 

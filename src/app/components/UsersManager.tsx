@@ -124,6 +124,8 @@ function AccountRow({
   const [resetting, setResetting] = useState(false);
   const [isUpdatingRole, startRoleTransition] = useTransition();
   const [roleError, setRoleError] = useState<string | null>(null);
+  // Your own account and the club owner's can't be demoted or deleted here.
+  const locked = isSelf || account.isOwner;
 
   function handleRoleChange(role: Role) {
     setRoleError(null);
@@ -145,12 +147,17 @@ function AccountRow({
             <p className="truncate font-medium">
               {account.username}
               {isSelf && <span className="ml-2 text-xs text-black/40">(you)</span>}
+              {account.isOwner && (
+                <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                  Owner
+                </span>
+              )}
             </p>
           </div>
           <p className="text-xs text-black/40">
             Added {new Date(account.createdAt).toLocaleDateString("en-US")}
           </p>
-          {isSelf ? (
+          {locked ? (
             <span
               className={`mt-1 inline-flex w-fit rounded-full px-2 py-0.5 text-[10px] font-medium ${
                 account.role === "admin" ? "bg-brand-light text-brand" : "bg-black/5 text-black/50"
@@ -184,7 +191,7 @@ function AccountRow({
             <IconKey className="h-4 w-4" />
           </button>
 
-          {!isSelf &&
+          {!locked &&
             (confirmingDelete ? (
               <div className="flex items-center gap-1">
                 <button

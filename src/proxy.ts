@@ -26,12 +26,15 @@ import { createServerClient } from "@supabase/ssr";
  * for this small private app is low (worst case is a confusing error
  * instead of a redirect, not exposed data).
  */
-const PUBLIC_PATHS = ["/login", "/join", "/welcome"];
+const PUBLIC_PATHS = ["/login", "/join", "/welcome", "/signup", "/forgot-password", "/auth/callback"];
 
 /** Public pages a signed-in user has no reason to see, so they're bounced to
  * the dashboard instead. `/welcome` (the marketing page) is deliberately not
  * in here — anyone may look at it, signed in or not. */
-const SIGNED_OUT_ONLY_PATHS = ["/login", "/join"];
+// `/signup` is deliberately not signed-out-only: a signed-in account that
+// never finished creating its club is sent there to finish (the page itself
+// redirects anyone who already has a club).
+const SIGNED_OUT_ONLY_PATHS = ["/login", "/join", "/forgot-password"];
 
 export async function proxy(request: NextRequest) {
   // No Supabase configured yet (first-run / local setup) — let the

@@ -1,13 +1,15 @@
 import { createClient } from "@/lib/supabase/server";
 import type { AppSettings, Game, Player, PlayerSessionWithPlayer, Session } from "@/lib/types";
 
+/** The signed-in user's club (RLS only ever returns their own one row) —
+ * its name, sport, icon and payment QR. Null when signed out or not yet in
+ * a club. */
 export async function getAppSettings(): Promise<AppSettings | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
-    .from("app_settings")
+    .from("clubs")
     .select("*")
-    .eq("id", 1)
-    .single();
+    .maybeSingle();
   if (error) {
     console.error("[getAppSettings] Supabase error:", error);
   }

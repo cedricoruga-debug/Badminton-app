@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { deleteSession, updateSession } from "@/app/actions";
 import { Modal } from "@/app/components/Modal";
 import { IconEdit } from "@/app/components/icons";
+import { SessionCostFields } from "@/app/components/SessionCostFields";
 import type { Session } from "@/lib/types";
 
 /** Small pencil icon button that opens an edit popup for the given session
@@ -35,43 +36,7 @@ export function EditSessionButton({ session }: { session: Session }) {
         <form action={updateSession} className="space-y-4">
           <input type="hidden" name="session_id" value={session.id} />
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-brand">Hours</label>
-              <input
-                type="number"
-                name="hours"
-                step="0.5"
-                min="0"
-                defaultValue={session.hours}
-                autoFocus
-                className="w-full rounded border border-black/15 px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-brand">Fee / hour</label>
-              <input
-                type="number"
-                name="fee_per_hour"
-                step="0.01"
-                min="0"
-                defaultValue={session.fee_per_hour}
-                className="w-full rounded border border-black/15 px-3 py-2 text-sm"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-brand">Shuttle tube cost</label>
-            <input
-              type="number"
-              name="shuttle_tube_cost"
-              step="0.01"
-              min="0"
-              defaultValue={session.shuttle_tube_cost}
-              className="w-full rounded border border-black/15 px-3 py-2 text-sm"
-            />
-          </div>
+          <SessionCostFields defaults={session} autoFocus />
 
           <div className="flex items-center justify-between border-t border-black/10 pt-4">
             <div>

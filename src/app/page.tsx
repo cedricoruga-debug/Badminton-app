@@ -1,4 +1,5 @@
 import { DashboardClient, type DashboardSeed } from "@/app/components/DashboardClient";
+import { redirect } from "next/navigation";
 import { SetupRequired } from "@/app/setup-required";
 import { getAppSettings, getGames, getLatestSession, getPlayerSessions, getSessionOptions } from "@/lib/queries";
 
@@ -33,6 +34,9 @@ export default async function Home() {
     getLatestSession(),
     getSessionOptions(),
   ]);
+  // Signed in but not in a club yet (a sign-up that didn't finish creating
+  // its club) — send them to finish that instead of an empty dashboard.
+  if (!settings) redirect("/signup");
   const [sessionPlayers, games] = session
     ? await Promise.all([getPlayerSessions(session.id), getGames(session.id)])
     : [[], []];

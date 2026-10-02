@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useState, useTransition, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { IconShuttle } from "@/app/components/icons";
+import { IconShuttle, IconSport } from "@/app/components/icons";
+import { sportCopy } from "@/lib/sport";
+import type { Sport } from "@/lib/types";
+import { UpNextAlert } from "./UpNextAlert";
 import { LiveDot } from "@/app/components/LiveDot";
 import { Matchup } from "@/app/components/Matchup";
 import { Modal } from "@/app/components/Modal";
@@ -113,6 +116,7 @@ export function JoinForm({ initialCode = "" }: { initialCode?: string }) {
   const [code, setCode] = useState(initialCode);
   const [error, setError] = useState<string | null>(null);
   const [sessionDate, setSessionDate] = useState<string | null>(null);
+  const [club, setClub] = useState<{ name: string | null; sport: Sport }>({ name: null, sport: "badminton" });
   const [games, setGames] = useState<QueueGame[] | null>(null);
   const [confirmedCode, setConfirmedCode] = useState<string | null>(null);
   // Set when the code belongs to a session that's been ended — shows the
@@ -127,14 +131,14 @@ export function JoinForm({ initialCode = "" }: { initialCode?: string }) {
 
   const loadQueue = useCallback(
     async (c: string, opts: { silent?: boolean } = {}) => {
-      const { data: matches, error: lookupError } = await supabase.rpc("find_session_by_join_code", {
+      const { data: matches, error: lookupError } = await supabase.rpc("find_session_by_join_code_v2", {
         code: c,
       });
       const session = matches?.[0];
       if (!lookupError && !session) {
         // No *open* session for this code — but if it's a real session that
         // was ended, that's a different message than a wrong code.
-        const { data: info } = await supabase.rpc("get_session_join_info", { code: c });
+        const { data: info } = await supabase.rpc("get_session_join_info_v2", { code: c });
         const found = info?.[0];
         if (found?.status === "Closed") {
           setEnded({
@@ -168,6 +172,10 @@ export function JoinForm({ initialCode = "" }: { initialCode?: string }) {
       }
 
       setSessionDate(session.session_date as string);
+      setClub({
+        name: (session.club_name as string | null) ?? null,
+        sport: session.sport === "pickleball" ? "pickleball" : "badminton",
+      });
       setGames(
         ((rows as QueueRow[] | null) ?? []).map((r) => ({
           gameNumber: r.game_number,
@@ -248,6 +256,7 @@ export function JoinForm({ initialCode = "" }: { initialCode?: string }) {
     return (
       <QueueView
         sessionDate={sessionDate}
+        club={club}
         games={games}
         code={confirmedCode}
         supabase={supabase}
@@ -312,6 +321,7 @@ export function JoinForm({ initialCode = "" }: { initialCode?: string }) {
  */
 function QueueView({
   sessionDate,
+  club,
   games,
   code,
   supabase,
@@ -319,6 +329,7 @@ function QueueView({
   onRequested,
 }: {
   sessionDate: string | null;
+  club: { name: string | null; sport: Sport };
   games: QueueGame[];
   code: string;
   supabase: SupabaseBrowserClient;
@@ -338,12 +349,12 @@ function QueueView({
         <div className="mx-auto flex w-full max-w-sm items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2.5">
             <span className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-white/15">
-              <IconShuttle className="h-5 w-5" />
+              <IconSport sport={club.sport} className="h-5 w-5" />
             </span>
             <div className="min-w-0">
               <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-white/75">
                 <LiveDot dot="bg-white" ping="bg-white/70" />
-                Live queue
+                <span className="truncate">{club.name ? `${club.name} · Live queue` : "Live queue"}</span>
               </p>
               <p className="truncate text-base font-semibold">
                 {sessionDate
@@ -375,6 +386,8 @@ function QueueView({
             {confirmation}
           </div>
         )}
+
+        <UpNextAlert code={code} supabase={supabase} games={games} matchWord={sportCopy(club.sport).matchWord} />
 
         <section className="rounded-2xl bg-white p-4 shadow-soft">
           <h2 className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-black/40">

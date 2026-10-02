@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import { useSport } from "@/app/components/ClubContext";
 import { EditGameButton } from "@/app/components/EditGameButton";
 import { IconEdit } from "@/app/components/icons";
 import { queueableAdvanceGameStatus, queueableFinishGameWithWinner, useIsOnline } from "@/lib/offlineQueue";
@@ -34,6 +35,10 @@ type GameForStatus = Pick<Game, "id" | "game_number" | "status" | "player1_id" |
  * bar's pencil — is still there for anything this shortcut doesn't cover:
  * swapping a player, correcting a winner, adding a score, or marking a
  * game done with no winner recorded at all ("No winner" below).
+ *
+ * Pickleball clubs get a pickleball court instead: blue playing surface,
+ * the non-volley zone ("kitchen") shaded next to the net, and the center
+ * line running from the kitchen line back to the baseline.
  */
 export function CourtBox({
   game,
@@ -49,6 +54,7 @@ export function CourtBox({
    * GameFormFields. */
   games?: GameForStatus[];
 }) {
+  const { sport } = useSport();
   const [armedTeam, setArmedTeam] = useState<"team1" | "team2" | null>(null);
   const [isFinishing, startFinishTransition] = useTransition();
   const [isMarkingDone, startMarkDoneTransition] = useTransition();
@@ -100,7 +106,11 @@ export function CourtBox({
            * and, once armed, its own Confirm. Wider than tall — the net
            * runs down the middle instead of across it — with room for a
            * name to wrap to a second line rather than truncate. */}
-          <div className="flex min-h-[140px] flex-1 flex-row border-2 border-white/60 bg-emerald-600">
+          <div
+            className={`flex min-h-[140px] flex-1 flex-row border-2 border-white/60 ${
+              sport === "pickleball" ? "bg-sky-600" : "bg-emerald-600"
+            }`}
+          >
             <TeamHalf
               names={team1Names}
               armed={armedTeam === "team1"}
@@ -108,6 +118,7 @@ export function CourtBox({
               onTap={() => setArmedTeam((prev) => (prev === "team1" ? null : "team1"))}
               onConfirm={() => confirmWinner("team1")}
               netEdge="right"
+              sport={sport}
             />
             <TeamHalf
               names={team2Names}
@@ -116,6 +127,7 @@ export function CourtBox({
               onTap={() => setArmedTeam((prev) => (prev === "team2" ? null : "team2"))}
               onConfirm={() => confirmWinner("team2")}
               netEdge="left"
+              sport={sport}
             />
           </div>
 
@@ -148,7 +160,9 @@ function TeamHalf({
   onTap,
   onConfirm,
   netEdge,
+  sport = "badminton",
 }: {
+  sport?: "badminton" | "pickleball";
   names: (string | null | undefined)[];
   armed: boolean;
   disabled: boolean;
@@ -200,11 +214,26 @@ function TeamHalf({
       className={`relative grid flex-1 grid-rows-2 transition-colors disabled:cursor-not-allowed hover:bg-white/10 active:bg-white/15 ${netBorder}`}
     >
       {/* Court markings — purely decorative, drawn under the names */}
+      {sport === "pickleball" ? (
+        <>
+          {/* Kitchen: 7ft of each 22ft half (~32%), shaded, next to the net */}
+          <span
+            aria-hidden="true"
+            className={`pointer-events-none absolute inset-y-0 w-[32%] border-white/60 bg-white/10 ${
+              nearNet === "right" ? "right-0 border-l" : "left-0 border-r"
+            }`}
+          />
+          <span aria-hidden="true" className={`pointer-events-none absolute top-1/2 h-0 w-[68%] border-t border-white/50 ${centerLine}`} />
+        </>
+      ) : (
+        <>
       <span aria-hidden="true" className={`pointer-events-none absolute inset-y-0 w-0 border-r border-white/45 ${shortServiceLine}`} />
       <span aria-hidden="true" className={`pointer-events-none absolute inset-y-0 w-0 border-r border-white/45 ${longServiceLine}`} />
       <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-[7.5%] h-0 border-t border-white/45" />
       <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-[7.5%] h-0 border-t border-white/45" />
       <span aria-hidden="true" className={`pointer-events-none absolute top-1/2 h-0 w-[70%] border-t border-white/45 ${centerLine}`} />
+        </>
+      )}
       <PlayerCell name={names[0]} />
       <PlayerCell name={names[1]} />
     </button>

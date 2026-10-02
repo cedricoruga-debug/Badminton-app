@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { currentUserRole } from "@/lib/accounts";
+import { getClubContext } from "@/lib/accounts";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -36,6 +36,16 @@ import { createClient } from "@/lib/supabase/server";
  * covering the discount even, a percentage wouldn't. Recomputed here
  * (rather than only inside setPlayerDiscount) so it stays right as games
  * are logged or a session's cost inputs change, same as total_games.
+ *
+ * Sport and fee mode (multi-tenant clubs):
+ *  - Pickleball: balls last the whole session, so the session's ball cost
+ *    (stored in shuttle_tube_cost) is split evenly across everyone
+ *    registered instead of per game played.
+ *  - Fixed-rate sessions: every player's fixed_fee is set to the session's
+ *    fixed fee, which the `payable` formula then uses directly (minus any
+ *    discount). Court/shuttle shares are still filled in so the Sessions
+ *    page can show the real profit. Nobody covers anyone else's discount in
+ *    fixed mode — it's just a discount off the flat fee.
  */
 async function recomputePlayerGameCounts(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -49,6 +59,7 @@ async function recomputePlayerGameCounts(
     { data: games, error: gamesError },
     { data: session, error: sessionError },
     { data: playerSessions, error: psError },
+    { data: club },
   ] = await Promise.all([
     supabase
       .from("games")
@@ -57,14 +68,23 @@ async function recomputePlayerGameCounts(
       .in("status", ["Ongoing", "Done"]),
     supabase
       .from("sessions")
-      .select("court_share_per_player, shuttle_fee_per_game")
+      .select("court_share_per_player, shuttle_fee_per_game, shuttle_tube_cost, fee_mode, fixed_fee")
       .eq("id", sessionId)
       .single(),
     supabase.from("player_sessions").select("id, player_id, discount_percent").eq("session_id", sessionId),
+    // RLS only ever returns the signed-in user's own club row.
+    supabase.from("clubs").select("sport").maybeSingle(),
   ]);
   if (gamesError) throw new Error(gamesError.message);
   if (sessionError) throw new Error(sessionError.message);
   if (psError) throw new Error(psError.message);
+
+  const sport = club?.sport ?? "badminton";
+  const isFixed = session.fee_mode === "fixed";
+  const rosterSize = (playerSessions ?? []).length;
+  // Pickleball balls are a whole-session cost, split evenly like the court.
+  const ballSharePerPlayer =
+    sport === "pickleball" && rosterSize > 0 ? Number(session.shuttle_tube_cost) / rosterSize : 0;
 
   const counts = new Map<string, number>();
   for (const g of games ?? []) {
@@ -73,16 +93,20 @@ async function recomputePlayerGameCounts(
     }
   }
 
-  const courtSharePerPlayer = session.court_share_per_player;
-  const shuttleFeePerGame = session.shuttle_fee_per_game;
+  const courtSharePerPlayer = Number(session.court_share_per_player);
+  const shuttleFeePerGame = Number(session.shuttle_fee_per_game);
 
   // Pass 1: fresh total_games/court_share/shuttle_share per player, plus
   // how much pesos their own discount_percent (if any) saves them.
   const shares = (playerSessions ?? []).map((ps) => {
     const totalGames = counts.get(ps.player_id) ?? 0;
     const courtShare = courtSharePerPlayer;
-    const shuttleShare = totalGames * shuttleFeePerGame;
-    const savedAmount = ps.discount_percent > 0 ? ((courtShare + shuttleShare) * ps.discount_percent) / 100 : 0;
+    const shuttleShare =
+      sport === "pickleball"
+        ? Math.round(ballSharePerPlayer * 100) / 100
+        : totalGames * shuttleFeePerGame;
+    const savedAmount =
+      !isFixed && ps.discount_percent > 0 ? ((courtShare + shuttleShare) * ps.discount_percent) / 100 : 0;
     return { ps, totalGames, courtShare, shuttleShare, savedAmount };
   });
 
@@ -111,6 +135,7 @@ async function recomputePlayerGameCounts(
       shuttle_share: shuttleShare,
       discount_percent: ps.discount_percent,
       surcharge_amount: ps.discount_percent === 0 ? Math.round(perPlayerSurcharge * 100) / 100 : 0,
+      fixed_fee: isFixed ? Number(session.fixed_fee) : null,
     }));
     const { error } = await supabase.from("player_sessions").upsert(rows, { onConflict: "id" });
     if (error) throw new Error(error.message);
@@ -253,7 +278,8 @@ export async function markPaid(playerSessionId: string, method: "Cash" | "Gcash"
 async function registerPlayerForSession(
   supabase: Awaited<ReturnType<typeof createClient>>,
   sessionId: string,
-  playerId: string
+  playerId: string,
+  { skipRecompute = false }: { skipRecompute?: boolean } = {}
 ) {
   const { count, error: countError } = await supabase
     .from("player_sessions")
@@ -285,6 +311,11 @@ async function registerPlayerForSession(
     shuttle_share: 0,
   });
   if (insertError) throw new Error(insertError.message);
+
+  // A bigger roster changes everyone's ball share (pickleball), fixed fee
+  // copy, and discount surcharge split — not just the court share above.
+  // (Bulk add skips this per name and recomputes once at the end.)
+  if (!skipRecompute) await recomputePlayerGameCounts(supabase, sessionId);
 }
 
 /**
@@ -327,7 +358,8 @@ async function findOrCreatePlayerByName(
 async function registerIfNotAlready(
   supabase: Awaited<ReturnType<typeof createClient>>,
   sessionId: string,
-  playerId: string
+  playerId: string,
+  options: { skipRecompute?: boolean } = {}
 ) {
   const { count: alreadyRegistered, error: existingRegError } = await supabase
     .from("player_sessions")
@@ -337,7 +369,7 @@ async function registerIfNotAlready(
   if (existingRegError) throw new Error(existingRegError.message);
 
   if (!alreadyRegistered) {
-    await registerPlayerForSession(supabase, sessionId, playerId);
+    await registerPlayerForSession(supabase, sessionId, playerId, options);
   }
 }
 
@@ -399,8 +431,9 @@ export async function bulkAddPlayers(formData: FormData) {
   // read the same stale count and stomp on each other's court-share split.
   for (const name of names) {
     const playerId = await findOrCreatePlayerByName(supabase, name);
-    await registerIfNotAlready(supabase, sessionId, playerId);
+    await registerIfNotAlready(supabase, sessionId, playerId, { skipRecompute: true });
   }
+  await recomputePlayerGameCounts(supabase, sessionId);
 
   revalidatePath("/");
   revalidatePath("/sessions");
@@ -441,6 +474,8 @@ export async function removePlayerFromSession(playerSessionId: string, sessionId
     .update({ court_share: session.court_share_per_player })
     .eq("session_id", sessionId);
   if (rebalanceError) throw new Error(rebalanceError.message);
+
+  await recomputePlayerGameCounts(supabase, sessionId);
 
   revalidatePath("/");
   revalidatePath("/sessions");
@@ -499,28 +534,34 @@ export async function setDoneForSession(playerSessionId: string, done: boolean) 
 }
 
 /**
- * Upload a new app icon and/or payment QR image and save them to
- * app_settings (the "Settings" popup). Either file is optional — only the
- * ones actually provided get uploaded and overwritten.
+ * The club's Settings popup: club name, sport, app icon and payment QR.
+ * Files are optional — only the ones actually provided get uploaded. Uploads
+ * go into the club's own "<club_id>/..." storage folder (storage policies
+ * only allow writing there).
  */
 export async function updateAppSettings(formData: FormData) {
   const supabase = await createClient();
 
-  // The Settings icon that opens this form only shows for admins in the
-  // nav — this is the server-side backstop for that, same reasoning as the
-  // admin checks in src/app/users/actions.ts.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (currentUserRole(user ?? undefined) !== "admin") {
-    throw new Error("Only an admin can change app settings.");
+  // The Settings icon only shows for admins in the nav — this is the
+  // server-side backstop for that, same reasoning as the admin checks in
+  // src/app/users/actions.ts.
+  const ctx = await getClubContext();
+  if (!ctx || ctx.role !== "admin") {
+    throw new Error("Only an admin can change club settings.");
   }
+  const clubId = ctx.club.id;
 
   const updates: Record<string, string> = {};
 
+  const name = String(formData.get("club_name") ?? "").trim();
+  if (name) updates.name = name.slice(0, 60);
+
+  const sport = String(formData.get("sport") ?? "");
+  if (sport === "badminton" || sport === "pickleball") updates.sport = sport;
+
   const appIcon = formData.get("app_icon");
   if (appIcon instanceof File && appIcon.size > 0) {
-    const path = `app-icon/${Date.now()}-${appIcon.name}`;
+    const path = `${clubId}/app-icon/${Date.now()}-${appIcon.name}`;
     const { error } = await supabase.storage
       .from("assets")
       .upload(path, appIcon, { contentType: appIcon.type, upsert: true });
@@ -530,7 +571,7 @@ export async function updateAppSettings(formData: FormData) {
 
   const qrCode = formData.get("qr_code");
   if (qrCode instanceof File && qrCode.size > 0) {
-    const path = `qr/${Date.now()}-${qrCode.name}`;
+    const path = `${clubId}/qr/${Date.now()}-${qrCode.name}`;
     const { error } = await supabase.storage
       .from("assets")
       .upload(path, qrCode, { contentType: qrCode.type, upsert: true });
@@ -539,7 +580,8 @@ export async function updateAppSettings(formData: FormData) {
   }
 
   if (Object.keys(updates).length > 0) {
-    const { error } = await supabase.from("app_settings").update(updates).eq("id", 1);
+    updates.updated_at = new Date().toISOString();
+    const { error } = await supabase.from("clubs").update(updates).eq("id", clubId);
     if (error) throw new Error(error.message);
   }
 
@@ -551,26 +593,27 @@ export async function updateAppSettings(formData: FormData) {
 const SHUTTLES_PER_TUBE = 12;
 
 /**
- * A fresh 6-digit code, checked against the database so it can't collide
- * with another session's — generated in code rather than a DB default so a
- * collision is just "try again," not a failed insert to recover from.
- * Sessions are created rarely (once a game day), so the extra round trip
- * per attempt is a non-issue; 20 tries against a 6-digit space is
- * effectively certain to succeed long before running out.
+ * A fresh 6-digit join code. Codes are global (players type one in with no
+ * club context), so the uniqueness check has to look across every club —
+ * done by the generate_join_code() database function, since a signed-in
+ * user can only see their own club's sessions.
  */
 async function generateUniqueJoinCode(
   supabase: Awaited<ReturnType<typeof createClient>>
 ): Promise<string> {
-  for (let attempt = 0; attempt < 20; attempt++) {
-    const code = String(Math.floor(100000 + Math.random() * 900000));
-    const { count, error } = await supabase
-      .from("sessions")
-      .select("id", { count: "exact", head: true })
-      .eq("join_code", code);
-    if (error) throw new Error(error.message);
-    if (!count) return code;
+  const { data, error } = await supabase.rpc("generate_join_code");
+  if (error) throw new Error(error.message);
+  return data as string;
+}
+
+/** Reads the fee-mode fields shared by the New and Edit Session forms. */
+function parseFeeFields(formData: FormData) {
+  const feeMode = formData.get("fee_mode") === "fixed" ? "fixed" : "split";
+  const fixedFee = Math.max(0, Number(formData.get("fixed_fee") ?? 0) || 0);
+  if (feeMode === "fixed" && fixedFee <= 0) {
+    throw new Error("Enter the fixed fee per player.");
   }
-  throw new Error("Could not generate a unique join code — try again.");
+  return { fee_mode: feeMode, fixed_fee: feeMode === "fixed" ? fixedFee : 0 };
 }
 
 /**
@@ -587,12 +630,14 @@ export async function createSession(formData: FormData) {
   const feePerHour = Number(formData.get("fee_per_hour") ?? 0) || 0;
   const shuttleTubeCost = Number(formData.get("shuttle_tube_cost") ?? 0) || 0;
   const shuttlesPerTube = SHUTTLES_PER_TUBE;
+  const fee = parseFeeFields(formData);
 
   const supabase = await createClient();
   const joinCode = await generateUniqueJoinCode(supabase);
 
-  // Only one session is ever "live" — starting a new one ends any that was
-  // still open, so an old QR can't keep showing a queue that's over.
+  // Only one session is ever "live" per club — starting a new one ends any
+  // that was still open (RLS limits this to the club's own sessions), so an
+  // old QR can't keep showing a queue that's over.
   const { error: closeError } = await supabase.from("sessions").update({ status: "Closed" }).eq("status", "Open");
   if (closeError) throw new Error(closeError.message);
 
@@ -603,6 +648,7 @@ export async function createSession(formData: FormData) {
     shuttle_tube_cost: shuttleTubeCost,
     shuttles_per_tube: shuttlesPerTube,
     join_code: joinCode,
+    ...fee,
   });
 
   if (error) throw new Error(error.message);
@@ -667,6 +713,7 @@ export async function updateSession(formData: FormData) {
   const hours = Number(formData.get("hours") ?? 0) || 0;
   const feePerHour = Number(formData.get("fee_per_hour") ?? 0) || 0;
   const shuttleTubeCost = Number(formData.get("shuttle_tube_cost") ?? 0) || 0;
+  const fee = parseFeeFields(formData);
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -675,6 +722,7 @@ export async function updateSession(formData: FormData) {
       hours,
       fee_per_hour: feePerHour,
       shuttle_tube_cost: shuttleTubeCost,
+      ...fee,
     })
     .eq("id", sessionId);
 

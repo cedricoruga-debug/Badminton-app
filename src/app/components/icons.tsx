@@ -217,3 +217,23 @@ export function IconFlag({ className }: IconProps) {
     </svg>
   );
 }
+
+/** A pickleball paddle with a holed ball — the pickleball counterpart of
+ * IconShuttle. */
+export function IconPickleball({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <rect x="3.5" y="2.5" width="9" height="11" rx="4.5" transform="rotate(-35 8 8)" />
+      <path d="m10.6 12.4 3.6 5.1" strokeWidth={2.4} />
+      <circle cx="18" cy="6" r="3" />
+      <circle cx="17.2" cy="5.3" r="0.45" fill="currentColor" stroke="none" />
+      <circle cx="18.9" cy="6.1" r="0.45" fill="currentColor" stroke="none" />
+      <circle cx="17.7" cy="7" r="0.45" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+/** The right ball/shuttle mark for a club's sport. */
+export function IconSport({ sport, className }: IconProps & { sport?: "badminton" | "pickleball" | null }) {
+  return sport === "pickleball" ? <IconPickleball className={className} /> : <IconShuttle className={className} />;
+}

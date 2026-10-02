@@ -15,15 +15,13 @@ import "@fontsource/nunito/700.css";
 import "@fontsource/nunito/800.css";
 import "./globals.css";
 import { AppChrome } from "@/app/components/AppChrome";
-import { currentUserRole } from "@/lib/accounts";
-import { getAppSettings } from "@/lib/queries";
+import { getClubContext } from "@/lib/accounts";
 import { createClient } from "@/lib/supabase/server";
 
-const APP_TITLE = "KRO5 Badminton";
-
 export const metadata: Metadata = {
-  title: APP_TITLE,
-  description: "Fun, simple badminton queuing for queue masters and badminton enthusiasts.",
+  title: "KRO5 — Badminton & Pickleball queuing",
+  description:
+    "Fun, simple queuing for badminton and pickleball queue masters. Live courts, fair rotations, automatic fees and easy payments.",
   manifest: "/manifest.json",
   icons: {
     icon: "/icons/icon-512.png",
@@ -37,36 +35,33 @@ export const viewport: Viewport = {
   themeColor: "#36c98f",
 };
 
-/** Whether the signed-in visitor is an admin — decides whether the nav
- * shows the Settings and Accounts icons at all (see SidePanel). Not signed
- * in (e.g. on /login) just means not an admin, same as any other visitor.
- *
- * Uses `getSession()` (reads the JWT out of the cookie, no network call)
- * rather than `getUser()` (a real round trip to Supabase's Auth server) —
- * same trade-off already made in proxy.ts, and for the same reason: this
- * runs in RootLayout, i.e. on every single page render, so a `getUser()`
- * here was adding a second per-request network round trip right back on
- * top of the one proxy.ts already eliminated. */
-async function getAuthState(): Promise<{ isAdmin: boolean; isSignedIn: boolean }> {
+/**
+ * Who's looking: signed in or not, and if so which club and role. The club
+ * row doubles as the "settings" the chrome needs (name, sport, icon, QR),
+ * so this is a single club_members→clubs query per render — replacing the
+ * old app_settings read, not adding to it. Signed-in detection uses
+ * getSession() (cookie only, no network round trip), same trade-off as
+ * proxy.ts.
+ */
+async function getAuthState() {
   const supabase = await createClient();
   const {
     data: { session },
   } = await supabase.auth.getSession();
-  return {
-    isAdmin: currentUserRole(session?.user ?? undefined) === "admin",
-    isSignedIn: !!session,
-  };
+  if (!session) return { club: null, isAdmin: false, isSignedIn: false };
+  const ctx = await getClubContext();
+  return { club: ctx?.club ?? null, isAdmin: ctx?.role === "admin", isSignedIn: true };
 }
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
-  const [settings, { isAdmin, isSignedIn }] = process.env.NEXT_PUBLIC_SUPABASE_URL
-    ? await Promise.all([getAppSettings(), getAuthState()])
-    : [null, { isAdmin: false, isSignedIn: false }];
+  const { club, isAdmin, isSignedIn } = process.env.NEXT_PUBLIC_SUPABASE_URL
+    ? await getAuthState()
+    : { club: null, isAdmin: false, isSignedIn: false };
 
   return (
     <html lang="en" className="h-full antialiased">
       <body className="min-h-full font-sans">
-        <AppChrome settings={settings} isAdmin={isAdmin} isSignedIn={isSignedIn}>
+        <AppChrome settings={club} isAdmin={isAdmin} isSignedIn={isSignedIn}>
           {children}
         </AppChrome>
       </body>

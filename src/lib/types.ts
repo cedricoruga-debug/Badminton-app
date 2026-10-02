@@ -21,6 +21,10 @@ export type Session = {
   shuttle_fee_per_game: number;
   player_count: number;
   court_share_per_player: number;
+  /** 'split' = share the real court + shuttle/ball costs (the original
+   * model); 'fixed' = everyone pays a flat `fixed_fee`. */
+  fee_mode: FeeMode;
+  fixed_fee: number;
   created_at: string;
 };
 
@@ -62,6 +66,9 @@ export type PlayerSession = {
    * always 0 for a player who has a discount of their own. See
    * recomputePlayerGameCounts in src/app/actions.ts. */
   surcharge_amount: number;
+  /** The session's fixed fee copied onto this row when the session is in
+   * fixed-rate mode (null in split mode) — the `payable` formula reads it. */
+  fixed_fee: number | null;
   payable: number;
   payment_method: "Cash" | "Gcash" | null;
   done_for_session: boolean;
@@ -72,10 +79,23 @@ export type PlayerSessionWithPlayer = PlayerSession & {
   player: Player;
 };
 
-export type AppSettings = {
-  id: 1;
-  display_title: string;
+export type Sport = "badminton" | "pickleball";
+
+export type FeeMode = "split" | "fixed";
+
+/** One tenant: a badminton or pickleball group with its own players,
+ * sessions, accounts, payment QR and icon. */
+export type Club = {
+  id: string;
+  name: string;
+  sport: Sport;
   payment_qr_url: string | null;
   app_icon_url: string | null;
+  owner_id: string | null;
+  created_at: string;
   updated_at: string;
 };
+
+/** The club's display settings (icon, QR, name, sport) — what used to be
+ * the single-row app_settings table before the app became multi-tenant. */
+export type AppSettings = Club;

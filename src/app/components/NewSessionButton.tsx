@@ -4,6 +4,7 @@ import { createSession } from "@/app/actions";
 import { Modal } from "@/app/components/Modal";
 import { SubmitButton } from "@/app/components/SubmitButton";
 import { IconCalendarPlus } from "@/app/components/icons";
+import { SessionCostFields } from "@/app/components/SessionCostFields";
 
 /** Today's date as a local YYYY-MM-DD string (not UTC — toISOString() alone
  * rolls back a day for timezones ahead of UTC, like the Philippines, any
@@ -33,39 +34,7 @@ export function NewSessionButton() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-brand">Hours</label>
-              <input
-                type="number"
-                name="hours"
-                step="0.5"
-                min="0"
-                className="w-full rounded border border-black/15 px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-brand">Fee / hour</label>
-              <input
-                type="number"
-                name="fee_per_hour"
-                step="0.01"
-                min="0"
-                className="w-full rounded border border-black/15 px-3 py-2 text-sm"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-brand">Shuttle tube cost</label>
-            <input
-              type="number"
-              name="shuttle_tube_cost"
-              step="0.01"
-              min="0"
-              className="w-full rounded border border-black/15 px-3 py-2 text-sm"
-            />
-          </div>
+          <SessionCostFields />
 
           <div className="flex justify-end gap-2 border-t border-black/10 pt-4">
             <button

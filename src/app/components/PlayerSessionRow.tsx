@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { removePlayerFromSession, setDoneForSession, setPlayerDiscount, unmarkPaid } from "@/app/actions";
+import { useSport } from "@/app/components/ClubContext";
 import { Modal } from "@/app/components/Modal";
 import { IconPeso, IconPhone, IconTrash } from "@/app/components/icons";
 import { queueableMarkPaid, useIsOnline } from "@/lib/offlineQueue";
@@ -89,6 +90,7 @@ export function PlayerSessionRow({
   ps: PlayerSessionWithPlayer;
   games?: GameWithPlayers[];
 }) {
+  const { copy } = useSport();
   const [isPending, startTransition] = useTransition();
   const [payPending, startPayTransition] = useTransition();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -331,7 +333,9 @@ export function PlayerSessionRow({
                     onChange={(e) => setDiscountDraft(e.target.value)}
                     className="w-20 rounded border border-black/15 px-2 py-1 text-sm"
                   />
-                  <span className="text-sm text-black/50">% off court + shuttle cost</span>
+                  <span className="text-sm text-black/50">
+                    {ps.fixed_fee != null ? "% off the fixed fee" : `% off court + ${copy.itemLower} cost`}
+                  </span>
                   <button
                     type="button"
                     onClick={saveDiscount}

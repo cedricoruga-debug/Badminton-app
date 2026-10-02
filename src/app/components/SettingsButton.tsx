@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { updateAppSettings } from "@/app/actions";
 import { Modal } from "@/app/components/Modal";
-import { IconSettings } from "@/app/components/icons";
+import { IconSettings, IconSport } from "@/app/components/icons";
 import { createClient } from "@/lib/supabase/client";
 import type { AppSettings } from "@/lib/types";
 
@@ -98,6 +98,43 @@ export function SettingsButton({ settings }: { settings: AppSettings | null }) {
       {(close) => (
         <div className="space-y-6">
         <form action={updateAppSettings} className="space-y-6">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-brand">Club name</label>
+            <p className="mb-2 text-xs text-black/40">Shown in the header and on your players&apos; join page.</p>
+            <input
+              type="text"
+              name="club_name"
+              maxLength={60}
+              defaultValue={settings?.name ?? ""}
+              className="w-full rounded border border-black/15 px-3 py-2 text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-brand">Sport</label>
+            <p className="mb-2 text-xs text-black/40">
+              Changes the wording, score hints, court drawing and how the {settings?.sport === "pickleball" ? "ball" : "shuttle"} cost is split.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {(["badminton", "pickleball"] as const).map((sport) => (
+                <label
+                  key={sport}
+                  className="flex cursor-pointer items-center gap-2 rounded-lg border border-black/15 px-3 py-2 text-sm font-medium has-[:checked]:border-brand has-[:checked]:bg-brand-light has-[:checked]:text-brand"
+                >
+                  <input
+                    type="radio"
+                    name="sport"
+                    value={sport}
+                    defaultChecked={(settings?.sport ?? "badminton") === sport}
+                    className="sr-only"
+                  />
+                  <IconSport sport={sport} className="h-4 w-4" />
+                  {sport === "badminton" ? "Badminton" : "Pickleball"}
+                </label>
+              ))}
+            </div>
+          </div>
+
           <div>
             <label className="mb-1 block text-sm font-medium text-brand">App icon</label>
             <p className="mb-2 text-xs text-black/40">Shown next to the app name in the header.</p>

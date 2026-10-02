@@ -66,3 +66,33 @@ where email = 'ced@badminton.local';
 Open your Supabase project → **SQL Editor** → paste in the contents of `supabase/enable_realtime.sql` from this repo → **Run**. This is a one-time step (it's already baked into `schema.sql` for anyone setting up a brand-new database, but an existing one needs it run separately).
 
 Without this, the app still works fine — it just won't pick up a change made on another device until you manually refresh (or switch away from the tab and back). With it, every open tab/device sees an add, edit, or delete the moment it happens anywhere else — no refresh needed.
+
+## 7. Clubs (multi-tenant) — sign-up, sports, fixed fees
+
+Since v3 the app is multi-tenant: anyone can create their own club at `/signup`
+(badminton or pickleball), and every club only ever sees its own players,
+sessions, games, payments, settings and staff accounts.
+
+- **Database:** run `supabase/multi_tenant.sql` once, after `schema.sql`
+  (safe to re-run). It creates `clubs` + `club_members`, adds `club_id` to every
+  table with Row Level Security scoped to the signed-in user's club, and turns
+  everything that already existed into the first club (with every existing login
+  as a member).
+- **Owners vs staff:** a club owner signs up with a real email + password. Staff
+  are added from the Accounts page as simple usernames (stored as
+  `<username>@badminton.local`, same as before). The login page accepts either.
+  Usernames are global, so two clubs can't both have a `ced`.
+- **Roles** now live in `club_members.role` (per club), not in the auth user's
+  `app_metadata`.
+- **Emails (forgot password):** Supabase's built-in mailer only delivers to your
+  own Supabase team's addresses. Before real customers can use "Forgot
+  password", set up custom SMTP (e.g. Resend) under Supabase → Authentication →
+  Emails → SMTP Settings, and add `https://<your-domain>/auth/callback` under
+  Authentication → URL Configuration → Redirect URLs. Sign-up itself does not
+  send any email (accounts are created already confirmed).
+- **Fixed-rate sessions:** a session can charge a flat fee per player instead of
+  splitting costs. Court/shuttle costs are still tracked, so the Sessions page
+  shows real profit.
+- **Pickleball clubs:** ball cost is split evenly per session (balls last all
+  night) instead of per game, scores hint "to 11", and live courts are drawn as
+  pickleball courts with the kitchen.
