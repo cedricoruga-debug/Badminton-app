@@ -38,6 +38,8 @@ export function SidePanel({ settings, isAdmin }: { settings: AppSettings | null;
 
   const navLinks = (
     <>
+      {/* Club profile — the club's picture, above Home. */}
+      <SettingsButton settings={settings} isAdmin={isAdmin} />
       {LINKS.map(({ href, label, icon: Icon }) => {
         const active = pathname === href;
         return (
@@ -57,7 +59,6 @@ export function SidePanel({ settings, isAdmin }: { settings: AppSettings | null;
 
       {isAdmin && (
         <>
-          <SettingsButton settings={settings} />
 
           <Link
             href="/users"

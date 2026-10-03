@@ -77,27 +77,61 @@ function ChangePasswordSection() {
   );
 }
 
-export function SettingsButton({ settings }: { settings: AppSettings | null }) {
+/** The club's picture (uploaded icon, or the sport mark as a fallback). */
+export function ClubAvatar({ club, className = "h-9 w-9" }: { club: AppSettings | null; className?: string }) {
+  return (
+    <span
+      className={`flex flex-none items-center justify-center overflow-hidden rounded-full bg-brand text-white ring-2 ring-brand/30 ${className}`}
+    >
+      {club?.app_icon_url ? (
+        // eslint-disable-next-line @next/next/no-img-element -- user-uploaded image of unknown origin
+        <img src={club.app_icon_url} alt="" className="h-full w-full object-cover" />
+      ) : (
+        <IconSport sport={club?.sport} className="h-1/2 w-1/2" />
+      )}
+    </span>
+  );
+}
+
+/**
+ * The club profile — the club's picture at the top of the nav (above Home),
+ * opening a popup with the club's name, sport and your role. Admins also
+ * get the club settings here (name, sport, picture, payment QR); everyone
+ * can change their own password.
+ */
+export function SettingsButton({ settings, isAdmin }: { settings: AppSettings | null; isAdmin: boolean }) {
   return (
     <Modal
-      label="Settings"
+      label="Club profile"
       icon={<IconSettings className="h-5 w-5" />}
-      title="Settings"
+      title="Club profile"
       trigger={(open) => (
         <button
           type="button"
           onClick={open}
-          title="Settings"
-          aria-label="Settings"
-          className="flex h-10 w-10 items-center justify-center rounded-lg text-black/50 transition-colors hover:bg-brand-light hover:text-brand"
+          title={settings?.name ? `${settings.name} — club profile` : "Club profile"}
+          aria-label="Club profile"
+          className="flex h-10 w-10 items-center justify-center rounded-full transition-transform hover:scale-105"
         >
-          <IconSettings className="h-5 w-5" />
+          <ClubAvatar club={settings} />
         </button>
       )}
     >
       {(close) => (
         <div className="space-y-6">
-        <form action={updateAppSettings} className="space-y-6">
+        <div className="flex items-center gap-3">
+          <ClubAvatar club={settings} className="h-14 w-14" />
+          <div className="min-w-0">
+            <p className="text-[11px] font-extrabold uppercase tracking-widest text-brand">KRO5</p>
+            <p className="truncate text-lg font-extrabold text-brand-dark">{settings?.name ?? "Your club"}</p>
+            <p className="text-xs text-black/50">
+              {settings?.sport === "pickleball" ? "Pickleball" : "Badminton"} club · You&apos;re {isAdmin ? "an admin" : "a member"}
+            </p>
+          </div>
+        </div>
+
+        {isAdmin && (
+        <form action={updateAppSettings} className="space-y-6 border-t border-black/10 pt-4">
           <div>
             <label className="mb-1 block text-sm font-medium text-brand">Club name</label>
             <p className="mb-2 text-xs text-black/40">Shown in the header and on your players&apos; join page.</p>
@@ -201,6 +235,7 @@ export function SettingsButton({ settings }: { settings: AppSettings | null }) {
             </button>
           </div>
         </form>
+        )}
 
         <ChangePasswordSection />
         </div>

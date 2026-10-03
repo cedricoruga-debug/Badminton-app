@@ -1,5 +1,7 @@
 "use client";
 
+import { useClub } from "@/app/components/ClubContext";
+import { ClubAvatar } from "@/app/components/SettingsButton";
 import { useEffect, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { CourtBox } from "@/app/components/CourtBox";
@@ -50,6 +52,7 @@ export type DashboardSeed = DashboardData & { fetchedAt: string };
  * derived from them.
  */
 export function DashboardClient({ seed }: { seed: DashboardSeed }) {
+  const club = useClub();
   // Whether this render's `seed` looks like it came from a live response
   // rather than one the service worker replayed from its own cache. Derived
   // straight from the prop (no state) so a later render with a genuinely
@@ -214,6 +217,24 @@ export function DashboardClient({ seed }: { seed: DashboardSeed }) {
           </div>
         </div>
       )}
+
+      {/* Brand row — the club's picture, KRO5 and the club name, at the very
+       * top of the dashboard (replaces the old fixed header bar). Scrolls
+       * away with the page so it never takes room from the courts. */}
+      <div className="flex-none px-4 pt-4">
+        <div className="flex items-center gap-2.5 rounded-xl bg-white px-3 py-2 shadow-soft">
+          <ClubAvatar club={club} className="h-8 w-8" />
+          <p className="flex min-w-0 items-baseline gap-1.5">
+            <span className="flex-none text-base font-extrabold tracking-tight text-brand-dark">KRO5</span>
+            {club?.name && <span className="truncate text-sm font-bold text-brand">· {club.name}</span>}
+          </p>
+          {club && (
+            <span className="ml-auto flex-none rounded-full bg-brand-light px-2.5 py-0.5 text-[11px] font-bold text-brand">
+              {club.sport === "pickleball" ? "Pickleball" : "Badminton"}
+            </span>
+          )}
+        </div>
+      </div>
 
       {/* Static shortcuts bar — portrait/mobile only. Stays put at the top
        * (sticky under the header) so these are always one tap away without
