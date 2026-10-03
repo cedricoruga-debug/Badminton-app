@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { setDoneForSession } from "@/app/actions";
 import { Modal } from "@/app/components/Modal";
 import { IconPeso, IconPhone } from "@/app/components/icons";
 import { queueableMarkPaid, useIsOnline } from "@/lib/offlineQueue";
@@ -12,7 +13,8 @@ const peso = (n: number) => `₱${n.toLocaleString("en-PH", { minimumFractionDig
  * "Payment" shortcut — collect from several players at once (e.g. one
  * person paying for their group). Step 1: tick players from the session's
  * unpaid list. Step 2: a breakdown of what each one owes and the total,
- * then mark them all paid via GCash or Cash in one tap.
+ * then mark them all paid via GCash or Cash in one tap — which also marks
+ * them Done for the session.
  */
 export function PayButton({ players }: { players: PlayerSessionWithPlayer[] }) {
   return (
@@ -54,7 +56,12 @@ function PayFlow({ players, onDone }: { players: PlayerSessionWithPlayer[]; onDo
     setError(null);
     startPaying(async () => {
       try {
-        for (const ps of chosen) await queueableMarkPaid(isOnline, ps.id, method);
+        // Paying means they're finished for the session: mark anyone still
+        // playing as Done, then record the payment method for everyone.
+        for (const ps of chosen) {
+          if (!ps.done_for_session && isOnline) await setDoneForSession(ps.id, true);
+          await queueableMarkPaid(isOnline, ps.id, method);
+        }
         onDone();
       } catch {
         setError("Couldn't save every payment — check the list and try again.");
@@ -120,7 +127,7 @@ function PayFlow({ players, onDone }: { players: PlayerSessionWithPlayer[]; onDo
               <p className="text-xs text-black/45">
                 {ps.total_games} game{ps.total_games === 1 ? "" : "s"}
                 {ps.discount_percent > 0 && ` · ${ps.discount_percent}% off`}
-                {!ps.done_for_session && " · still playing"}
+                {!ps.done_for_session && " · will be marked done"}
               </p>
             </div>
             <span className="flex-none font-semibold">{peso(Number(ps.payable))}</span>
