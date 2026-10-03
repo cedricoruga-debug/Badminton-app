@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { IconCalendar, IconHome, IconKey, IconLogout, IconTrophy } from "@/app/components/icons";
+import { IconCalendar, IconHome, IconKey, IconLogout, IconRacket, IconTrophy } from "@/app/components/icons";
 import { SettingsButton } from "@/app/components/SettingsButton";
 import { clearLocalCache } from "@/lib/localCache";
 import { createClient } from "@/lib/supabase/client";
@@ -10,6 +10,7 @@ import type { AppSettings } from "@/lib/types";
 
 const LINKS = [
   { href: "/", label: "Home", icon: IconHome },
+  { href: "/games", label: "Games", icon: IconRacket },
   { href: "/sessions", label: "Sessions", icon: IconCalendar },
   { href: "/leaderboard", label: "Leaderboard", icon: IconTrophy },
 ];

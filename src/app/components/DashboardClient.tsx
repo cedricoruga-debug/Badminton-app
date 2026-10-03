@@ -3,10 +3,10 @@
 import { useClub } from "@/app/components/ClubContext";
 import { ClubAvatar } from "@/app/components/SettingsButton";
 import { useEffect, useState, type CSSProperties } from "react";
-import Link from "next/link";
 import { CourtBox } from "@/app/components/CourtBox";
 import { GameRow } from "@/app/components/GameRow";
-import { IconPlus, IconRacket, IconTrophy, IconUserPlus, IconUsers } from "@/app/components/icons";
+import { IconPeso, IconPlus, IconRacket, IconTrophy, IconUserPlus, IconUsers } from "@/app/components/icons";
+import { PayButton } from "@/app/components/PayButton";
 import { JoinQrSection } from "@/app/components/JoinQrSection";
 import { LiveDot } from "@/app/components/LiveDot";
 import { NewGameButton } from "@/app/components/NewGameButton";
@@ -171,12 +171,16 @@ export function DashboardClient({ seed }: { seed: DashboardSeed }) {
     <>
       {session?.status === "Open" ? <EndSessionButton sessionId={session.id} /> : <NewSessionButton />}
 
-      <Link href="/games" className="shortcut-tile flex flex-col items-center gap-1">
-        <span className="flex h-9 w-9 items-center justify-center rounded-full btn-brand text-white transition-transform hover:scale-105">
-          <IconTrophy className="h-4 w-4" />
-        </span>
-        <span className="text-[10px] leading-tight text-black/60">Games</span>
-      </Link>
+      {session ? (
+        <PayButton players={sessionPlayers} />
+      ) : (
+        <div className="shortcut-tile flex flex-col items-center gap-1 opacity-40">
+          <span className="flex h-9 w-9 items-center justify-center rounded-full btn-brand text-white">
+            <IconPeso className="h-4 w-4" />
+          </span>
+          <span className="text-[10px] leading-tight text-black/60">Payment</span>
+        </div>
+      )}
 
       {session ? (
         <NewGameButton
