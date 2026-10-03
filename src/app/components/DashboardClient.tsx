@@ -206,7 +206,7 @@ export function DashboardClient({ seed }: { seed: DashboardSeed }) {
   );
 
   return (
-    <div className="flex flex-col landscape:h-[calc(100dvh-60px)] landscape:overflow-hidden">
+    <div className="flex flex-col landscape:h-[calc(100dvh)] landscape:overflow-hidden">
       {isOffline && (
         <div className="flex-none px-4 pt-4">
           <div className="rounded-lg bg-black/70 px-3 py-2 text-center text-xs font-medium text-white">
@@ -220,7 +220,7 @@ export function DashboardClient({ seed }: { seed: DashboardSeed }) {
        * scrolling all the way down to the QR panel. In landscape/desktop
        * the buttons go back to their original spot at the bottom of the QR
        * panel below, so this bar is hidden there instead. */}
-      <div className="sticky top-[60px] z-30 flex-none px-4 pt-4 landscape:hidden">
+      <div className="sticky top-0 z-30 flex-none px-4 pt-4 landscape:hidden">
         <div className="rounded-xl bg-white p-3 shadow-soft">
           <div className="grid grid-cols-2 gap-2 text-center">{shortcutButtons}</div>
         </div>

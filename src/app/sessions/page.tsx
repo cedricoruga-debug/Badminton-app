@@ -62,7 +62,7 @@ export default async function SessionsPage(props: PageProps<"/sessions">) {
       : "Total earning";
 
   return (
-    <div className="flex flex-col p-4 landscape:h-[calc(100dvh-60px)] landscape:overflow-hidden">
+    <div className="flex flex-col p-4 landscape:h-[calc(100dvh)] landscape:overflow-hidden">
       {sessions.length === 0 ? (
         <p className="py-8 text-center text-sm text-black/40">No sessions yet.</p>
       ) : (

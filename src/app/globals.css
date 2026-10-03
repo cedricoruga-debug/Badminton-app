@@ -33,7 +33,7 @@ body {
 
 /*
  * The landscape/desktop pages (Dashboard, Sessions, Games) render a fixed
- * two-pane layout — `landscape:h-[calc(100dvh-60px)] landscape:overflow-hidden`
+ * two-pane layout — `landscape:h-[calc(100dvh)] landscape:overflow-hidden`
  * on the page's own root div — where each pane is meant to scroll on its
  * own, not the page as a whole. On some browsers/devices that per-element
  * height cap can still end up a few pixels off (dynamic viewport quirks,

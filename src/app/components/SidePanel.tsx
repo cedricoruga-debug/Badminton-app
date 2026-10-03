@@ -77,7 +77,7 @@ export function SidePanel({ settings, isAdmin }: { settings: AppSettings | null;
   return (
     <>
       {/* Desktop: right-hand icon rail */}
-      <nav className="sticky top-[60px] hidden h-[calc(100dvh-60px)] w-16 flex-none flex-col items-center gap-3 border-l border-black/10 bg-white pt-4 landscape:flex">
+      <nav className="sticky top-0 hidden h-[calc(100dvh)] w-16 flex-none flex-col items-center gap-3 border-l border-black/10 bg-white pt-4 landscape:flex">
         {navLinks}
         <button
           type="button"

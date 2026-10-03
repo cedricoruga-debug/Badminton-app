@@ -107,7 +107,7 @@ export function CourtBox({
            * runs down the middle instead of across it — with room for a
            * name to wrap to a second line rather than truncate. */}
           <div
-            className={`flex min-h-[140px] flex-1 flex-row border-2 border-white/60 ${
+            className={`flex min-h-[140px] flex-1 border-2 border-white/60 portrait:min-h-[250px] portrait:flex-col landscape:flex-row ${
               sport === "pickleball" ? "bg-sky-600" : "bg-emerald-600"
             }`}
           >
@@ -173,18 +173,38 @@ function TeamHalf({
    * little way in from it, same as a real court. */
   netEdge: "left" | "right";
 }) {
-  const netBorder = netEdge === "right" ? "border-r-[3px] border-white/90" : "";
+  // Phones in portrait get a standing court (team 1 on top, net across
+  // the middle, team 2 below) — a much better fit for a narrow screen.
+  // Landscape keeps the sideways court (team 1 left, net down the middle).
+  // Every line below therefore has a portrait: and a landscape: version.
+  const first = netEdge === "right"; // team 1's half: net on its right / bottom
+  const netBorder = first ? "border-white/90 portrait:border-b-[3px] landscape:border-r-[3px]" : "";
 
-  // Line positions, as a share of this half's length (net to back edge =
-  // 6.7m on a real court) and width (6.1m): the short service line sits
-  // 1.98m from the net (~30%), the doubles long service line 0.76m in from
-  // the back edge (~11%), the singles sidelines 0.46m in from each side
-  // (~7.5%), and the center line only runs from the short service line back
-  // to the back edge — not between the service line and the net.
-  const nearNet = netEdge === "right" ? "right" : "left";
-  const shortServiceLine = nearNet === "right" ? "right-[30%]" : "left-[30%]";
-  const longServiceLine = nearNet === "right" ? "left-[11%]" : "right-[11%]";
-  const centerLine = nearNet === "right" ? "left-0" : "right-0";
+  // Badminton line positions, as a share of this half's length (net to
+  // back edge = 6.7m) and width (6.1m): short service line 1.98m from the
+  // net (~30%), doubles long service line 0.76m from the back (~11%),
+  // singles sidelines 0.46m in from each side (~7.5%), and the center line
+  // from the short service line back to the back edge.
+  const H = "portrait:inset-x-0 portrait:h-0 portrait:border-t"; // across the court when standing
+  const V = "landscape:inset-y-0 landscape:w-0 landscape:border-r"; // across the court when sideways
+  const shortServiceLine = first
+    ? `${H} portrait:bottom-[30%] ${V} landscape:right-[30%]`
+    : `${H} portrait:top-[30%] ${V} landscape:left-[30%]`;
+  const longServiceLine = first
+    ? `${H} portrait:top-[11%] ${V} landscape:left-[11%]`
+    : `${H} portrait:bottom-[11%] ${V} landscape:right-[11%]`;
+  const sideline1 =
+    "portrait:inset-y-0 portrait:left-[7.5%] portrait:w-0 portrait:border-l landscape:inset-x-0 landscape:top-[7.5%] landscape:h-0 landscape:border-t";
+  const sideline2 =
+    "portrait:inset-y-0 portrait:right-[7.5%] portrait:w-0 portrait:border-l landscape:inset-x-0 landscape:bottom-[7.5%] landscape:h-0 landscape:border-t";
+  const centerLine = (len: "70" | "68") =>
+    `portrait:left-1/2 portrait:w-0 portrait:border-l ${len === "70" ? "portrait:h-[70%] landscape:w-[70%]" : "portrait:h-[68%] landscape:w-[68%]"} landscape:top-1/2 landscape:h-0 landscape:border-t ${
+      first ? "portrait:top-0 landscape:left-0" : "portrait:bottom-0 landscape:right-0"
+    }`;
+  // Pickleball kitchen: 7ft of each 22ft half (~32%), next to the net.
+  const kitchen = first
+    ? "portrait:inset-x-0 portrait:bottom-0 portrait:h-[32%] portrait:border-t landscape:inset-y-0 landscape:right-0 landscape:w-[32%] landscape:border-l"
+    : "portrait:inset-x-0 portrait:top-0 portrait:h-[32%] portrait:border-b landscape:inset-y-0 landscape:left-0 landscape:w-[32%] landscape:border-r";
 
   if (armed) {
     const teamLabel = names.filter(Boolean).join(" & ") || "—";
@@ -211,27 +231,21 @@ function TeamHalf({
       type="button"
       disabled={disabled}
       onClick={onTap}
-      className={`relative grid flex-1 grid-rows-2 transition-colors disabled:cursor-not-allowed hover:bg-white/10 active:bg-white/15 ${netBorder}`}
+      className={`relative grid flex-1 portrait:grid-cols-2 landscape:grid-rows-2 transition-colors disabled:cursor-not-allowed hover:bg-white/10 active:bg-white/15 ${netBorder}`}
     >
       {/* Court markings — purely decorative, drawn under the names */}
       {sport === "pickleball" ? (
         <>
-          {/* Kitchen: 7ft of each 22ft half (~32%), shaded, next to the net */}
-          <span
-            aria-hidden="true"
-            className={`pointer-events-none absolute inset-y-0 w-[32%] border-white/60 bg-white/10 ${
-              nearNet === "right" ? "right-0 border-l" : "left-0 border-r"
-            }`}
-          />
-          <span aria-hidden="true" className={`pointer-events-none absolute top-1/2 h-0 w-[68%] border-t border-white/50 ${centerLine}`} />
+          <span aria-hidden="true" className={`pointer-events-none absolute border-white/60 bg-white/10 ${kitchen}`} />
+          <span aria-hidden="true" className={`pointer-events-none absolute border-white/50 ${centerLine("68")}`} />
         </>
       ) : (
         <>
-      <span aria-hidden="true" className={`pointer-events-none absolute inset-y-0 w-0 border-r border-white/45 ${shortServiceLine}`} />
-      <span aria-hidden="true" className={`pointer-events-none absolute inset-y-0 w-0 border-r border-white/45 ${longServiceLine}`} />
-      <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-[7.5%] h-0 border-t border-white/45" />
-      <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-[7.5%] h-0 border-t border-white/45" />
-      <span aria-hidden="true" className={`pointer-events-none absolute top-1/2 h-0 w-[70%] border-t border-white/45 ${centerLine}`} />
+          <span aria-hidden="true" className={`pointer-events-none absolute border-white/45 ${shortServiceLine}`} />
+          <span aria-hidden="true" className={`pointer-events-none absolute border-white/45 ${longServiceLine}`} />
+          <span aria-hidden="true" className={`pointer-events-none absolute border-white/45 ${sideline1}`} />
+          <span aria-hidden="true" className={`pointer-events-none absolute border-white/45 ${sideline2}`} />
+          <span aria-hidden="true" className={`pointer-events-none absolute border-white/45 ${centerLine("70")}`} />
         </>
       )}
       <PlayerCell name={names[0]} />

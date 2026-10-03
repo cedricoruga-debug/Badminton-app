@@ -3,14 +3,12 @@
 import { useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { ClubProvider } from "@/app/components/ClubContext";
-import { IconSport } from "@/app/components/icons";
 import { OfflineBanner } from "@/app/components/OfflineBanner";
 import { SidePanel } from "@/app/components/SidePanel";
 import { registerServiceWorker } from "@/lib/registerSW";
 import { createClient } from "@/lib/supabase/client";
 import type { AppSettings } from "@/lib/types";
 
-import { BRAND, sportCopy } from "@/lib/sport";
 
 /** Every table a page on this site reads from — a change to any of them
  * could be showing on someone else's screen right now. */
@@ -181,29 +179,8 @@ export function AppChrome({
 
   return (
     <ClubProvider club={settings}>
-    <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-50 flex items-center gap-3 bg-brand px-4 py-3 text-white shadow-[0_2px_14px_rgba(54,201,143,0.3)]">
-        <span className="flex h-8 w-8 flex-none items-center justify-center overflow-hidden rounded-full bg-white/15">
-          {settings?.app_icon_url ? (
-            // eslint-disable-next-line @next/next/no-img-element -- user-uploaded image of unknown origin
-            <img src={settings.app_icon_url} alt="" className="h-full w-full object-cover" />
-          ) : (
-            <IconSport sport={settings?.sport} className="h-5 w-5" />
-          )}
-        </span>
-        <h1 className="flex min-w-0 items-baseline gap-2 text-lg font-semibold">
-          <span className="font-extrabold tracking-tight">{BRAND}</span>
-          {settings?.name && (
-            <span className="truncate font-semibold text-white/85">· {settings.name}</span>
-          )}
-        </h1>
-        {settings && (
-          <span className="ml-auto flex-none rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-semibold">
-            {sportCopy(settings.sport).label}
-          </span>
-        )}
-      </header>
-      <div className="sticky top-[60px] z-40">
+    <div className="flex min-h-screen flex-col pt-[env(safe-area-inset-top)]">
+      <div className="sticky top-0 z-40">
         <OfflineBanner />
       </div>
       <div className="flex flex-1">
