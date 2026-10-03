@@ -25,8 +25,11 @@ export function SessionCostFields({ session, autoFocus = false }: { session?: Se
     ? "Each player's total is rounded up to the next ₱10, plus ₱10."
     : "Each player pays exactly this — rounded up to the next peso.";
 
-  if (session && session.fee_mode !== "simple") {
-    return <LegacyFields session={session} costLabel={copy.costLabel} input={input} />;
+  // Editing: keep whatever model the session was created with. New
+  // session: use the club's chosen pricing (club profile → Pricing).
+  const useLegacy = session ? session.fee_mode !== "simple" : club?.default_fee_mode === "split";
+  if (useLegacy) {
+    return <LegacyFields session={session} costLabel={copy.costLabel} input={input} roundNote={roundNote} />;
   }
 
   return (
@@ -91,29 +94,43 @@ export function SessionCostFields({ session, autoFocus = false }: { session?: Se
   );
 }
 
-/** The original pricing inputs, for sessions created before simple pricing. */
-function LegacyFields({ session, costLabel, input }: { session: Session; costLabel: string; input: string }) {
+/** The original pricing inputs: court hours × rate (split evenly across
+ * players) + shuttle tube cost (one shuttle per game, shared by 4). Used for
+ * sessions created that way, and for new sessions when the club's pricing
+ * is set to it. */
+function LegacyFields({
+  session,
+  costLabel,
+  input,
+  roundNote,
+}: {
+  session?: Session;
+  costLabel: string;
+  input: string;
+  roundNote: string;
+}) {
+  const mode = session?.fee_mode ?? "split";
   return (
     <div className="space-y-4">
-      <input type="hidden" name="fee_mode" value={session.fee_mode} />
-      {session.fee_mode === "fixed" && <input type="hidden" name="fixed_fee" value={session.fixed_fee} />}
-      <p className="rounded-lg bg-black/5 px-3 py-2 text-xs text-black/50">
-        This session uses the original pricing (court hours × rate + {costLabel.toLowerCase()}).
-      </p>
+      <input type="hidden" name="fee_mode" value={mode} />
+      {mode === "fixed" && <input type="hidden" name="fixed_fee" value={session?.fixed_fee ?? 0} />}
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="mb-1 block text-sm font-medium text-brand">Court hours</label>
-          <input type="number" name="hours" step="0.5" min="0" defaultValue={session.hours} className={input} />
+          <input type="number" name="hours" step="0.5" min="0" defaultValue={session?.hours} className={input} />
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-brand">Fee / hour</label>
-          <input type="number" name="fee_per_hour" step="0.01" min="0" defaultValue={session.fee_per_hour} className={input} />
+          <input type="number" name="fee_per_hour" step="0.01" min="0" defaultValue={session?.fee_per_hour} className={input} />
         </div>
       </div>
       <div>
         <label className="mb-1 block text-sm font-medium text-brand">{costLabel}</label>
-        <input type="number" name="shuttle_tube_cost" step="0.01" min="0" defaultValue={session.shuttle_tube_cost} className={input} />
+        <input type="number" name="shuttle_tube_cost" step="0.01" min="0" defaultValue={session?.shuttle_tube_cost} className={input} />
       </div>
+      <p className="text-xs text-black/40">
+        Court fee is split evenly across players; shuttles are charged per game played. {roundNote}
+      </p>
     </div>
   );
 }

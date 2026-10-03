@@ -107,6 +107,10 @@ export type Club = {
   /** Round each player's amount up to the next ₱10, then add ₱10 (the
    * original group's rule). Off for new clubs. */
   round_up_buffer: boolean;
+  /** How the Start Session form prices new sessions: 'simple' (court fee +
+   * price per game) or 'split' (court hours × rate + shuttle tube, the
+   * original model). Changeable in the club profile. */
+  default_fee_mode: "simple" | "split";
   created_at: string;
   updated_at: string;
 };

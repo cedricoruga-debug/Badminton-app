@@ -38,3 +38,11 @@ alter table player_sessions alter column payable set expression as (
     else ceil((court_share + shuttle_share) * (1 - discount_percent / 100.0) + surcharge_amount)
   end
 );
+
+-- Each club picks how Start Session prices new sessions (changeable in the
+-- club profile). The original club keeps the original model.
+alter table clubs add column if not exists default_fee_mode text not null default 'simple';
+do $$ begin
+  alter table clubs add constraint clubs_default_fee_mode_check check (default_fee_mode in ('simple', 'split'));
+exception when duplicate_object then null; end $$;
+-- (The live database set default_fee_mode = 'split' for the original club.)

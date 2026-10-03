@@ -565,13 +565,18 @@ export async function updateAppSettings(formData: FormData) {
   }
   const clubId = ctx.club.id;
 
-  const updates: Record<string, string> = {};
+  const updates: Record<string, string | boolean> = {};
 
   const name = String(formData.get("club_name") ?? "").trim();
   if (name) updates.name = name.slice(0, 60);
 
   const sport = String(formData.get("sport") ?? "");
   if (sport === "badminton" || sport === "pickleball") updates.sport = sport;
+
+  const feeMode = String(formData.get("default_fee_mode") ?? "");
+  if (feeMode === "simple" || feeMode === "split") updates.default_fee_mode = feeMode;
+  const roundUp = formData.get("round_up_buffer");
+  const roundUpValue = roundUp === "on" ? true : roundUp === "off" ? false : null;
 
   // Uploads go through the server with the service-role key, into the
   // "club-assets" bucket, which has no write access for signed-in users at
@@ -597,6 +602,8 @@ export async function updateAppSettings(formData: FormData) {
     if (!qrCode.type.startsWith("image/")) throw new Error("QR code must be an image.");
     updates.payment_qr_url = await upload(qrCode, "qr", "QR image");
   }
+
+  if (roundUpValue !== null) updates.round_up_buffer = roundUpValue;
 
   if (Object.keys(updates).length > 0) {
     updates.updated_at = new Date().toISOString();

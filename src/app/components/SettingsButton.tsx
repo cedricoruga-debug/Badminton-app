@@ -195,6 +195,32 @@ export function SettingsButton({ settings, isAdmin }: { settings: AppSettings | 
           </div>
 
           <div>
+            <label className="mb-1 block text-sm font-medium text-brand">Pricing for new sessions</label>
+            <p className="mb-2 text-xs text-black/40">What Start Session asks for. Existing sessions keep the pricing they were created with.</p>
+            <div className="space-y-2">
+              <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-black/15 px-3 py-2 text-sm has-[:checked]:border-brand has-[:checked]:bg-brand-light">
+                <input type="radio" name="default_fee_mode" value="split" defaultChecked={settings?.default_fee_mode === "split"} className="mt-0.5 accent-[var(--color-brand)]" />
+                <span><span className="font-medium">Court hours + {settings?.sport === "pickleball" ? "ball" : "shuttle tube"} cost</span><span className="block text-xs text-black/45">Court fee split evenly; {settings?.sport === "pickleball" ? "balls split per session" : "shuttles charged per game played"}.</span></span>
+              </label>
+              <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-black/15 px-3 py-2 text-sm has-[:checked]:border-brand has-[:checked]:bg-brand-light">
+                <input type="radio" name="default_fee_mode" value="simple" defaultChecked={settings?.default_fee_mode !== "split"} className="mt-0.5 accent-[var(--color-brand)]" />
+                <span><span className="font-medium">Court fee + price per game</span><span className="block text-xs text-black/45">Court rent split (or per player) plus a price you set for each game.</span></span>
+              </label>
+            </div>
+            <label className="mt-3 block text-sm font-medium text-brand">Rounding</label>
+            <div className="mt-1 grid grid-cols-2 gap-2">
+              <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-black/15 px-3 py-2 text-sm has-[:checked]:border-brand has-[:checked]:bg-brand-light">
+                <input type="radio" name="round_up_buffer" value="on" defaultChecked={!!settings?.round_up_buffer} className="mt-0.5 accent-[var(--color-brand)]" />
+                <span className="text-xs">Round up to ₱10, then +₱10</span>
+              </label>
+              <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-black/15 px-3 py-2 text-sm has-[:checked]:border-brand has-[:checked]:bg-brand-light">
+                <input type="radio" name="round_up_buffer" value="off" defaultChecked={!settings?.round_up_buffer} className="mt-0.5 accent-[var(--color-brand)]" />
+                <span className="text-xs">Exact amount</span>
+              </label>
+            </div>
+          </div>
+
+          <div>
             <label className="mb-1 block text-sm font-medium text-brand">Payment QR code</label>
             <p className="mb-2 text-xs text-black/40">Shown on the dashboard for players to scan and pay.</p>
             <div className="flex items-center gap-3">
