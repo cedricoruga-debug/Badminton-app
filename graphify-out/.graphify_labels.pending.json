@@ -1,0 +1,22 @@
+{
+  "0": "queries.ts",
+  "1": "next",
+  "2": "createClient",
+  "3": "icons.tsx",
+  "4": "welcome/page.tsx",
+  "5": "app/actions.ts",
+  "6": "package.json",
+  "7": "JoinForm.tsx",
+  "8": "PlayerSessionRow.tsx",
+  "9": "sessions/page.tsx",
+  "10": "compilerOptions",
+  "11": "leaderboard/page.tsx",
+  "12": "Going live (Vercel + GitHub)",
+  "13": "manifest.json",
+  "14": "sw.js",
+  "15": "vercel.json",
+  "16": "AGENTS.md",
+  "17": "CLAUDE.md",
+  "18": ".claude/CLAUDE.md",
+  "19": "postcss.config.mjs"
+}
