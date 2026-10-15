@@ -20,7 +20,7 @@
 // src/lib/localCache.ts (IndexedDB) is for; this file only ever deals in
 // the app shell.
 
-const CACHE_VERSION = "v1";
+const CACHE_VERSION = "v2";
 const NAV_CACHE = `badminton-nav-${CACHE_VERSION}`;
 const ASSET_CACHE = `badminton-assets-${CACHE_VERSION}`;
 const CURRENT_CACHES = new Set([NAV_CACHE, ASSET_CACHE]);
