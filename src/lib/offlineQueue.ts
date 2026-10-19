@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 import { advanceGameStatus, finishGameWithWinner, markPaid } from "@/app/actions";
 
 /**
@@ -95,50 +95,116 @@ export function useOfflineQueue(): QueuedAction[] {
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }
 
+/*
+ * Connectivity — ONE shared checker for the whole tab, no matter how many
+ * components ask. This used to be a per-component useEffect with its own
+ * 15s /api/ping timer, and it's called from every GameRow, CourtBox,
+ * PayButton and PlayerSessionRow — so a busy dashboard ran ~60 timers per
+ * device, each one a Vercel function call (plus the proxy). That alone ate
+ * most of the Vercel Hobby CPU allowance on game days.
+ *
+ * Now: a single module-level loop, started by the first subscriber and
+ * stopped when the last one unmounts. It pings rarely while things look
+ * fine (the browser's online/offline events already catch most drops), more
+ * often only while we think we're offline so recovery is noticed quickly,
+ * and not at all while the tab is hidden.
+ */
+const PING_WHILE_ONLINE_MS = 60_000;
+const PING_WHILE_OFFLINE_MS = 10_000;
+
+let onlineState = true;
+const onlineListeners = new Set<() => void>();
+let pingTimer: ReturnType<typeof setTimeout> | null = null;
+let pingInFlight = false;
+
+function setOnline(next: boolean) {
+  if (next === onlineState) return;
+  onlineState = next;
+  for (const listener of onlineListeners) listener();
+}
+
+async function ping(): Promise<boolean> {
+  if (typeof navigator !== "undefined" && !navigator.onLine) return false;
+  try {
+    const res = await fetch("/api/ping", { cache: "no-store" });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function check() {
+  if (pingInFlight) return;
+  pingInFlight = true;
+  try {
+    const ok = await ping();
+    setOnline(ok);
+    if (ok) flushQueue();
+  } finally {
+    pingInFlight = false;
+    scheduleNextPing();
+  }
+}
+
+function scheduleNextPing() {
+  if (pingTimer) clearTimeout(pingTimer);
+  pingTimer = null;
+  if (onlineListeners.size === 0) return;
+  pingTimer = setTimeout(
+    () => {
+      // Hidden tab: don't spend anything, just look again later. Coming
+      // back to the tab triggers an immediate check (onVisible below).
+      if (document.visibilityState !== "visible") return scheduleNextPing();
+      check();
+    },
+    onlineState ? PING_WHILE_ONLINE_MS : PING_WHILE_OFFLINE_MS
+  );
+}
+
+function onBrowserOffline() {
+  setOnline(false);
+  scheduleNextPing();
+}
+
+function onVisible() {
+  if (document.visibilityState === "visible") check();
+}
+
+function subscribeOnline(listener: () => void) {
+  const isFirst = onlineListeners.size === 0;
+  onlineListeners.add(listener);
+  if (isFirst) {
+    window.addEventListener("online", check);
+    window.addEventListener("offline", onBrowserOffline);
+    document.addEventListener("visibilitychange", onVisible);
+    check();
+  }
+  return () => {
+    onlineListeners.delete(listener);
+    if (onlineListeners.size === 0) {
+      window.removeEventListener("online", check);
+      window.removeEventListener("offline", onBrowserOffline);
+      document.removeEventListener("visibilitychange", onVisible);
+      if (pingTimer) clearTimeout(pingTimer);
+      pingTimer = null;
+    }
+  };
+}
+
 /**
- * Tracks whether the app can currently reach the server — browser
- * online/offline events for the fast path, plus a periodic real ping (see
- * module comment above) since a dead wifi router can leave the device
- * "online" with nowhere to actually go. Also triggers a queue flush the
- * moment it flips back to true.
+ * Whether the app can currently reach the server — browser online/offline
+ * events for the fast path, plus an occasional real ping (see module
+ * comment above) since a dead wifi router can leave the device "online"
+ * with nowhere to actually go. Also triggers a queue flush the moment it
+ * flips back to true. Safe to call from any number of components: they all
+ * share one checker.
  */
 export function useIsOnline(): boolean {
-  const [isOnline, setIsOnline] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function ping(): Promise<boolean> {
-      if (typeof navigator !== "undefined" && !navigator.onLine) return false;
-      try {
-        const res = await fetch("/api/ping", { cache: "no-store" });
-        return res.ok;
-      } catch {
-        return false;
-      }
-    }
-
-    async function check() {
-      const ok = await ping();
-      if (cancelled) return;
-      setIsOnline(ok);
-      if (ok) flushQueue();
-    }
-
-    check();
-    const interval = setInterval(check, 15000);
-    window.addEventListener("online", check);
-    window.addEventListener("offline", check);
-
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-      window.removeEventListener("online", check);
-      window.removeEventListener("offline", check);
-    };
-  }, []);
-
-  return isOnline;
+  return useSyncExternalStore(
+    subscribeOnline,
+    () => onlineState,
+    () => true
+  );
 }
 
 /** Replays whatever's queued, in order, stopping at the first failure

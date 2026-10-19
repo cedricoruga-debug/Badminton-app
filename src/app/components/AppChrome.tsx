@@ -24,14 +24,23 @@ const COALESCE_MS = 400;
 const MIN_MS_BETWEEN_REFOCUS_REFRESH = 5000;
 
 /**
- * How often the poll fallback below rechecks while the tab is open and
- * visible. Short enough that "someone requested a set and the queue master
- * is staring at the screen waiting" never turns into an actual wait, long
- * enough not to hammer the server when Realtime is doing its job fine (the
- * common case) — this only ever does real work when Realtime hasn't
- * already refreshed more recently than this.
+ * Poll fallback cadence. Every poll is a full server re-render of the page
+ * on Vercel (router.refresh), so this is the single most expensive thing
+ * the app does — the old flat 8s poll on every open tab burned most of the
+ * Vercel Hobby CPU allowance on game days.
+ *
+ * - While Realtime is NOT connected: poll fairly quickly, since it's the
+ *   only thing keeping the screen fresh.
+ * - While Realtime IS connected: it already pushes every change instantly,
+ *   and supabase-js's own heartbeat (~25s) notices a quietly-dead socket
+ *   and reconnects — which triggers mechanism #2's catch-up refresh. So
+ *   only a slow safety net is needed.
  */
-const POLL_MS = 8000;
+const POLL_MS_REALTIME_DOWN = 15_000;
+const POLL_MS_REALTIME_UP = 120_000;
+/** How often the poll timer wakes to decide whether a refresh is due —
+ * cheap, client-only, no network unless a refresh is actually due. */
+const POLL_TICK_MS = 5_000;
 
 /**
  * Keeps the current page's data in sync with everyone else's — the whole
@@ -63,11 +72,9 @@ const POLL_MS = 8000;
  *    stops delivering events while everything still *looks* connected.
  *    That's exactly the "someone requests a set and the queue master is
  *    already looking at the screen, but it takes forever to show up" case.
- *    This is the backstop for it: while the tab is open and visible, just
- *    recheck every POLL_MS regardless of what Realtime is doing. Skipped
- *    whenever a refresh already happened within the last POLL_MS (from
- *    Realtime or otherwise), so it costs nothing beyond an idle timer on
- *    the common path where Realtime is working fine.
+ *    Backstop: while the tab is visible, refresh if nothing has refreshed
+ *    for POLL_MS_REALTIME_DOWN (Realtime not subscribed) or
+ *    POLL_MS_REALTIME_UP (subscribed) — see those constants for why.
  */
 function useLiveRefresh(enabled: boolean) {
   const router = useRouter();
@@ -79,6 +86,7 @@ function useLiveRefresh(enabled: boolean) {
     const supabase = createClient();
     let coalesceTimer: ReturnType<typeof setTimeout> | null = null;
     let hasSubscribedOnce = false;
+    let realtimeUp = false;
 
     function refreshNow() {
       lastRefresh.current = Date.now();
@@ -96,6 +104,7 @@ function useLiveRefresh(enabled: boolean) {
       channel.on("postgres_changes", { event: "*", schema: "public", table }, onDbChange);
     }
     channel.subscribe((status) => {
+      realtimeUp = status === "SUBSCRIBED";
       if (status === "SUBSCRIBED") {
         if (hasSubscribedOnce) {
           // A reconnect after a drop, not the initial connect — catch up on
@@ -114,11 +123,15 @@ function useLiveRefresh(enabled: boolean) {
     document.addEventListener("visibilitychange", onRefocus);
     window.addEventListener("focus", onRefocus);
 
+    // Count from mount, not from 0 — the page was just rendered fresh, so
+    // the first poll shouldn't fire immediately.
+    lastRefresh.current = Date.now();
     const pollTimer = setInterval(() => {
       if (document.visibilityState !== "visible") return;
-      if (Date.now() - lastRefresh.current < POLL_MS) return;
+      const due = realtimeUp ? POLL_MS_REALTIME_UP : POLL_MS_REALTIME_DOWN;
+      if (Date.now() - lastRefresh.current < due) return;
       refreshNow();
-    }, POLL_MS);
+    }, POLL_TICK_MS);
 
     return () => {
       if (coalesceTimer) clearTimeout(coalesceTimer);
