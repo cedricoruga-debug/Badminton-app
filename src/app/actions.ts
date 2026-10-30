@@ -773,6 +773,15 @@ export async function endSession(sessionId: string) {
   const { error } = await supabase.from("sessions").update({ status: "Closed" }).eq("id", sessionId);
   if (error) throw new Error(error.message);
 
+  // Everyone's done once the session is over — marking them all done is
+  // what shows each player's amount payable on the dashboard. Reopening
+  // the session doesn't undo this; toggle a player back if needed.
+  const { error: doneError } = await supabase
+    .from("player_sessions")
+    .update({ done_for_session: true })
+    .eq("session_id", sessionId);
+  if (doneError) throw new Error(doneError.message);
+
   revalidatePath("/");
   revalidatePath("/sessions");
 }
