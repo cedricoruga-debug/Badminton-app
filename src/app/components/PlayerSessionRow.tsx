@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { removePlayerFromSession, setDoneForSession, setPlayerDiscount, unmarkPaid } from "@/app/actions";
+import { removePlayerFromSession, setDoneForSession, setPlayerDiscount, setPlayerGender, unmarkPaid } from "@/app/actions";
 import { useSport } from "@/app/components/ClubContext";
 import { Modal } from "@/app/components/Modal";
 import { IconPeso, IconPhone, IconTrash } from "@/app/components/icons";
 import { queueableMarkPaid, useIsOnline } from "@/lib/offlineQueue";
 import type { GameWithPlayers } from "@/lib/queries";
-import type { PlayerSessionWithPlayer } from "@/lib/types";
+import type { PlayerGender, PlayerSessionWithPlayer } from "@/lib/types";
 
 const GAME_STATUS_STYLES: Record<string, string> = {
   Ongoing: "bg-amber-100 text-amber-800",
@@ -134,6 +134,7 @@ export function PlayerSessionRow({
   const [payPending, startPayTransition] = useTransition();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [discountPending, startDiscountTransition] = useTransition();
+  const [genderPending, startGenderTransition] = useTransition();
   const isOnline = useIsOnline();
   const [editingDiscount, setEditingDiscount] = useState(false);
   const [discountDraft, setDiscountDraft] = useState(String(ps.discount_percent));
@@ -345,6 +346,28 @@ export function PlayerSessionRow({
             </div>
 
             <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-black/40">Gender</p>
+              <div className="grid grid-cols-2 gap-1 rounded-lg bg-black/5 p-1">
+                {(["Male", "Female"] as PlayerGender[]).map((g) => (
+                  <button
+                    key={g}
+                    type="button"
+                    disabled={genderPending}
+                    // Tapping the selected one again clears it.
+                    onClick={() =>
+                      startGenderTransition(() => setPlayerGender(ps.player_id, ps.player.gender === g ? null : g))
+                    }
+                    className={`rounded-md px-3 py-1.5 text-sm font-medium transition disabled:opacity-50 ${
+                      ps.player.gender === g ? "bg-white text-brand shadow-sm" : "text-black/50"
+                    }`}
+                  >
+                    {g}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
               <div className="mb-2 flex items-center justify-between">
                 <p className="text-xs font-semibold uppercase tracking-wide text-black/40">Discount</p>
                 {!editingDiscount && (
@@ -409,6 +432,18 @@ export function PlayerSessionRow({
                   ) : (
                     "No discount"
                   )}
+                </p>
+              )}
+              {/* The session's MVP fee — see recomputePlayerGameCounts. */}
+              {ps.mvp_adjustment < 0 && (
+                <p className="mt-1 text-sm font-medium text-emerald-700">
+                  Today&apos;s MVP — ₱{(-ps.mvp_adjustment).toFixed(2)} off
+                </p>
+              )}
+              {ps.mvp_adjustment > 0 && (
+                <p className="mt-1 text-sm text-black/60">
+                  <span className="font-medium text-amber-700">+₱{ps.mvp_adjustment.toFixed(2)}</span> to help
+                  cover the MVP discount
                 </p>
               )}
             </div>

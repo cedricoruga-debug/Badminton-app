@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createPlayer } from "@/app/actions";
+import { GenderField } from "@/app/components/GenderField";
 
 export default function NewPlayerPage() {
   return (
@@ -22,6 +23,8 @@ export default function NewPlayerPage() {
             className="w-full rounded border border-black/15 px-3 py-2 text-sm"
           />
         </div>
+
+        <GenderField />
 
         <div className="flex justify-end gap-2 border-t border-black/10 pt-4">
           <Link

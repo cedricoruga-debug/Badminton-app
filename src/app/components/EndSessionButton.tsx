@@ -22,7 +22,8 @@ export function EndSessionButton({ sessionId }: { sessionId: string }) {
         <div className="space-y-4">
           <p className="text-sm text-black/70">
             Players who scan the QR will see that the session has ended, along with the payment QR, instead of the
-            live queue. You can still record payments here on the dashboard.
+            live queue. Every player is marked done so their fee shows, and you can still record payments here on
+            the dashboard.
           </p>
           <div className="flex justify-end gap-2 border-t border-black/10 pt-4">
             <button
