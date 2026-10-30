@@ -16,6 +16,7 @@ import { NewSessionButton } from "@/app/components/NewSessionButton";
 import { PaymentQrSection } from "@/app/components/PaymentQrSection";
 import { PlayerSessionRow } from "@/app/components/PlayerSessionRow";
 import { loadActiveDashboardData, seedFromServer, type DashboardData } from "@/lib/localCache";
+import { getMvpPlayerIds } from "@/lib/mvp";
 
 /** How old the embedded server data can be before this load gets treated as
  * a page the service worker replayed from its own cache (see
@@ -118,46 +119,16 @@ export function DashboardClient({ seed }: { seed: DashboardSeed }) {
   const totalPlayers = sessionPlayers.length;
   const paidPlayersCount = sessionPlayers.filter((ps) => ps.payment_method !== null).length;
 
-  // MVP = best win rate, not most wins — a game with no winner recorded is
-  // how a split (each team took one set) gets logged, so it's a real result
-  // worth crediting, just not a clean win. Points per player per Done game:
-  // 2 for being on the winning pair, 1 for a split (winner_team null on a
-  // Done game — everyone in it gets credit, not just one side), 0 for the
-  // losing pair. A game that hasn't been marked Done yet also has
-  // winner_team null, but isn't a result at all — only Done games count
-  // here. Win rate is points earned over the max possible (2 per game
-  // played), so a session with nothing decided yet just shows no MVP
-  // rather than a misleading 0%.
-  const points = new Map<string, number>();
-  const doneGamesPlayed = new Map<string, number>();
-  for (const g of games) {
-    if (g.status !== "Done") continue;
-    const slots = [g.player1_id, g.player2_id, g.player3_id, g.player4_id].filter(
-      (id): id is string => Boolean(id)
-    );
-    for (const playerId of slots) {
-      doneGamesPlayed.set(playerId, (doneGamesPlayed.get(playerId) ?? 0) + 1);
-    }
-    if (g.winner_team) {
-      const winners = g.winner_team === "team1" ? [g.player1_id, g.player2_id] : [g.player3_id, g.player4_id];
-      for (const playerId of winners) {
-        if (playerId) points.set(playerId, (points.get(playerId) ?? 0) + 2);
-      }
-    } else {
-      for (const playerId of slots) {
-        points.set(playerId, (points.get(playerId) ?? 0) + 1);
-      }
-    }
-  }
-  const winRates = new Map<string, number>();
-  for (const [playerId, gamesPlayed] of doneGamesPlayed) {
-    winRates.set(playerId, (points.get(playerId) ?? 0) / (2 * gamesPlayed));
-  }
-  const bestWinRate = winRates.size > 0 ? Math.max(...winRates.values()) : 0;
+  // Today's MVP — same formula the server uses to give the MVP(s) the
+  // session's MVP fee off (see src/lib/mvp.ts).
+  const mvpIds = getMvpPlayerIds(
+    games,
+    sessionPlayers.map((ps) => ps.player_id)
+  );
   const mvpNames =
-    winRates.size > 0
+    mvpIds.size > 0
       ? sessionPlayers
-          .filter((ps) => winRates.get(ps.player_id) === bestWinRate)
+          .filter((ps) => mvpIds.has(ps.player_id))
           .map((ps) => ps.player.name)
           .join(" & ")
       : null;

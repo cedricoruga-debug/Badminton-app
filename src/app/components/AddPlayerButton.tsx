@@ -1,6 +1,7 @@
 "use client";
 
 import { createPlayer } from "@/app/actions";
+import { GenderField } from "@/app/components/GenderField";
 import { Modal } from "@/app/components/Modal";
 import { SubmitButton } from "@/app/components/SubmitButton";
 import { IconUserPlus } from "@/app/components/icons";
@@ -43,6 +44,8 @@ export function AddPlayerButton({ sessionId }: { sessionId: string }) {
               className="w-full rounded border border-black/15 px-3 py-2 text-sm"
             />
           </div>
+
+          <GenderField />
 
           <div className="flex justify-end gap-2 border-t border-black/10 pt-4">
             <button

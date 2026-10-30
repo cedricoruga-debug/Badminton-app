@@ -4,7 +4,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getClubContext } from "@/lib/accounts";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getMvpPlayerIds } from "@/lib/mvp";
 import { createClient } from "@/lib/supabase/server";
+import type { PlayerGender } from "@/lib/types";
 
 /**
  * Recompute total_games, court_share and shuttle_share for every player
@@ -47,6 +49,16 @@ import { createClient } from "@/lib/supabase/server";
  *    discount). Court/shuttle shares are still filled in so the Sessions
  *    page can show the real profit. Nobody covers anyone else's discount in
  *    fixed mode — it's just a discount off the flat fee.
+ *
+ * MVP fee: when the session has an mvp_fee set, Today's MVP (same formula
+ * as the dashboard — see src/lib/mvp.ts) gets that many pesos off, shared
+ * equally if two or more players tie for MVP. The total actually given
+ * away is split evenly across everyone else who played at least one game
+ * (and isn't already free on a 100% discount), as a positive
+ * mvp_adjustment — so, like discounts, the session still collects the
+ * same total. An MVP's share is capped at what they'd otherwise owe, so a
+ * big MVP fee can't push anyone below ₱0 or make the others over-pay.
+ * Applies in every fee mode, and moves as games finish and the MVP changes.
  */
 async function recomputePlayerGameCounts(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -64,13 +76,13 @@ async function recomputePlayerGameCounts(
   ] = await Promise.all([
     supabase
       .from("games")
-      .select("player1_id, player2_id, player3_id, player4_id")
+      .select("status, winner_team, player1_id, player2_id, player3_id, player4_id")
       .eq("session_id", sessionId)
       .in("status", ["Ongoing", "Done"]),
     supabase
       .from("sessions")
       .select(
-        "court_share_per_player, shuttle_fee_per_game, shuttle_tube_cost, fee_mode, fixed_fee, court_fee_type, court_amount, per_game_fee"
+        "court_share_per_player, shuttle_fee_per_game, shuttle_tube_cost, fee_mode, fixed_fee, court_fee_type, court_amount, per_game_fee, mvp_fee"
       )
       .eq("id", sessionId)
       .single(),
@@ -130,6 +142,35 @@ async function recomputePlayerGameCounts(
   const nonDiscountedCount = shares.filter((s) => s.ps.discount_percent === 0).length;
   const perPlayerSurcharge = nonDiscountedCount > 0 ? totalSaved / nonDiscountedCount : 0;
 
+  // Pass 3: the MVP fee. Each MVP gets an equal share off (capped at what
+  // they'd owe anyway); whoever else played covers the total evenly.
+  const mvpAdjustments = new Map<string, number>();
+  const mvpFee = Number(session.mvp_fee ?? 0);
+  if (mvpFee > 0) {
+    const mvpIds = getMvpPlayerIds(
+      games ?? [],
+      shares.map((s) => s.ps.player_id)
+    );
+    const coverers = shares.filter(
+      (s) => !mvpIds.has(s.ps.player_id) && s.totalGames > 0 && s.ps.discount_percent < 100
+    );
+    if (mvpIds.size > 0 && coverers.length > 0) {
+      let totalGiven = 0;
+      for (const s of shares) {
+        if (!mvpIds.has(s.ps.player_id)) continue;
+        const owed = isFixed
+          ? Number(session.fixed_fee) * (1 - s.ps.discount_percent / 100)
+          : (s.courtShare + s.shuttleShare) * (1 - s.ps.discount_percent / 100) +
+            (s.ps.discount_percent === 0 ? perPlayerSurcharge : 0);
+        const off = Math.round(Math.min(mvpFee / mvpIds.size, Math.max(0, owed)) * 100) / 100;
+        mvpAdjustments.set(s.ps.id, -off);
+        totalGiven += off;
+      }
+      const perCoverer = Math.round((totalGiven / coverers.length) * 100) / 100;
+      for (const s of coverers) mvpAdjustments.set(s.ps.id, perCoverer);
+    }
+  }
+
   // One request updating every player_session row at once, instead of one
   // request per player (this function runs after every game
   // create/edit/delete/status change, so with a full roster that used to
@@ -148,6 +189,7 @@ async function recomputePlayerGameCounts(
       shuttle_share: shuttleShare,
       discount_percent: ps.discount_percent,
       surcharge_amount: ps.discount_percent === 0 ? Math.round(perPlayerSurcharge * 100) / 100 : 0,
+      mvp_adjustment: mvpAdjustments.get(ps.id) ?? 0,
       fixed_fee: isFixed ? Number(session.fixed_fee) : null,
       use_buffer: useBuffer,
     }));
@@ -342,7 +384,8 @@ async function registerPlayerForSession(
  */
 async function findOrCreatePlayerByName(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  name: string
+  name: string,
+  gender: PlayerGender | null = null
 ): Promise<string> {
   const { data: existing, error: lookupError } = await supabase
     .from("players")
@@ -351,15 +394,42 @@ async function findOrCreatePlayerByName(
     .maybeSingle();
   if (lookupError) throw new Error(lookupError.message);
 
-  if (existing) return existing.id;
+  if (existing) {
+    // A returning player: only touch gender if the form actually set one,
+    // so leaving it blank never wipes what's already on file.
+    if (gender) {
+      const { error } = await supabase.from("players").update({ gender }).eq("id", existing.id);
+      if (error) throw new Error(error.message);
+    }
+    return existing.id;
+  }
 
   const { data: player, error } = await supabase
     .from("players")
-    .insert({ name })
+    .insert({ name, gender })
     .select("id")
     .single();
   if (error) throw new Error(error.message);
   return player.id;
+}
+
+function parseGender(value: FormDataEntryValue | string | null): PlayerGender | null {
+  return value === "Male" || value === "Female" ? value : null;
+}
+
+/** Set (or clear, with null) a player's gender — the Male/Female picker in
+ * the player popup. Lives on the player, not the session, so it carries
+ * over to every session they join. */
+export async function setPlayerGender(playerId: string, gender: PlayerGender | null) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("players")
+    .update({ gender: parseGender(gender) })
+    .eq("id", playerId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/");
+  revalidatePath("/sessions");
 }
 
 /**
@@ -397,9 +467,10 @@ export async function createPlayer(formData: FormData) {
   const sessionId = String(formData.get("session_id") ?? "");
   const redirectTo = String(formData.get("redirect_to") ?? "/");
   if (!name) throw new Error("Name is required");
+  const gender = parseGender(formData.get("gender"));
 
   const supabase = await createClient();
-  const playerId = await findOrCreatePlayerByName(supabase, name);
+  const playerId = await findOrCreatePlayerByName(supabase, name, gender);
 
   if (sessionId) {
     await registerIfNotAlready(supabase, sessionId, playerId);
@@ -663,6 +734,7 @@ export async function createSession(formData: FormData) {
   const shuttleTubeCost = Number(formData.get("shuttle_tube_cost") ?? 0) || 0;
   const shuttlesPerTube = SHUTTLES_PER_TUBE;
   const fee = parseFeeFields(formData);
+  const mvpFee = Math.max(0, Number(formData.get("mvp_fee") ?? 0) || 0);
 
   const supabase = await createClient();
   const joinCode = await generateUniqueJoinCode(supabase);
@@ -680,6 +752,7 @@ export async function createSession(formData: FormData) {
     shuttle_tube_cost: shuttleTubeCost,
     shuttles_per_tube: shuttlesPerTube,
     join_code: joinCode,
+    mvp_fee: mvpFee,
     ...fee,
   });
 
@@ -746,6 +819,7 @@ export async function updateSession(formData: FormData) {
   const feePerHour = Number(formData.get("fee_per_hour") ?? 0) || 0;
   const shuttleTubeCost = Number(formData.get("shuttle_tube_cost") ?? 0) || 0;
   const fee = parseFeeFields(formData);
+  const mvpFee = Math.max(0, Number(formData.get("mvp_fee") ?? 0) || 0);
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -754,6 +828,7 @@ export async function updateSession(formData: FormData) {
       hours,
       fee_per_hour: feePerHour,
       shuttle_tube_cost: shuttleTubeCost,
+      mvp_fee: mvpFee,
       ...fee,
     })
     .eq("id", sessionId);

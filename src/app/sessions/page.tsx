@@ -110,6 +110,9 @@ export default async function SessionsPage(props: PageProps<"/sessions">) {
                     value={`₱${selectedSession.court_amount.toFixed(2)}`}
                   />
                   <Stat label="Price per game" value={`₱${selectedSession.per_game_fee.toFixed(2)}`} />
+                  {selectedSession.mvp_fee > 0 && (
+                    <Stat label="MVP discount" value={`₱${selectedSession.mvp_fee.toFixed(2)}`} />
+                  )}
                   <Stat label="Players" value={selectedPlayers.length} />
                   {selectedSession.court_fee_type === "total" && (
                     <Stat

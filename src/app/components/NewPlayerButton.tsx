@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { bulkAddPlayers, createPlayer } from "@/app/actions";
+import { GenderField } from "@/app/components/GenderField";
 import { SubmitButton } from "@/app/components/SubmitButton";
 import { IconUserPlus } from "@/app/components/icons";
 
@@ -101,6 +102,8 @@ export function NewPlayerButton({
               className="w-full rounded border border-black/15 bg-white px-2 py-1.5 text-sm"
             />
           </div>
+
+          <GenderField compact />
 
           <div className="flex justify-end">
             <SubmitButton

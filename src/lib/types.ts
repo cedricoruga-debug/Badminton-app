@@ -1,9 +1,13 @@
 export type Player = {
   id: string;
   name: string;
+  /** Optional — null until someone sets it. */
+  gender: PlayerGender | null;
   active: boolean;
   created_at: string;
 };
+
+export type PlayerGender = "Male" | "Female";
 
 export type Session = {
   id: string;
@@ -31,6 +35,9 @@ export type Session = {
   court_amount: number;
   /** Simple pricing: charged per game a player plays. */
   per_game_fee: number;
+  /** Pesos off Today's MVP's fee, shared equally between tied MVPs and
+   * covered evenly by everyone else who played. 0 = off. */
+  mvp_fee: number;
   created_at: string;
 };
 
@@ -72,6 +79,10 @@ export type PlayerSession = {
    * always 0 for a player who has a discount of their own. See
    * recomputePlayerGameCounts in src/app/actions.ts. */
   surcharge_amount: number;
+  /** Server-managed, like surcharge_amount: negative for an MVP (their share
+   * of the session's mvp_fee off), positive for everyone else who played
+   * (their even share of covering it), 0 otherwise. */
+  mvp_adjustment: number;
   /** The session's fixed fee copied onto this row when the session is in
    * fixed-rate mode (null in split mode) — the `payable` formula reads it. */
   fixed_fee: number | null;

@@ -29,7 +29,12 @@ export function SessionCostFields({ session, autoFocus = false }: { session?: Se
   // session: use the club's chosen pricing (club profile → Pricing).
   const useLegacy = session ? session.fee_mode !== "simple" : club?.default_fee_mode === "split";
   if (useLegacy) {
-    return <LegacyFields session={session} costLabel={copy.costLabel} input={input} roundNote={roundNote} />;
+    return (
+      <div className="space-y-4">
+        <LegacyFields session={session} costLabel={copy.costLabel} input={input} roundNote={roundNote} />
+        <MvpFeeField session={session} input={input} />
+      </div>
+    );
   }
 
   return (
@@ -90,6 +95,31 @@ export function SessionCostFields({ session, autoFocus = false }: { session?: Se
           Charged for each game a player plays (covers {copy.itemLower}s and your earnings). {roundNote}
         </p>
       </div>
+
+      <MvpFeeField session={session} input={input} />
+    </div>
+  );
+}
+
+/** Optional pesos off Today's MVP's fee — the rest of the players cover it
+ * (see recomputePlayerGameCounts in actions.ts). */
+function MvpFeeField({ session, input }: { session?: Session; input: string }) {
+  return (
+    <div>
+      <label className="mb-1 block text-sm font-medium text-brand">MVP discount</label>
+      <input
+        type="number"
+        name="mvp_fee"
+        step="1"
+        min="0"
+        defaultValue={session?.mvp_fee || ""}
+        placeholder="e.g. 50 (optional)"
+        className={input}
+      />
+      <p className="mt-1 text-xs text-black/40">
+        Taken off Today&apos;s MVP&apos;s fee and shared evenly by everyone else who played. Two or more
+        MVPs split it equally.
+      </p>
     </div>
   );
 }
