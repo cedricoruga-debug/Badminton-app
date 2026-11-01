@@ -7,6 +7,7 @@ import { useSport } from "@/app/components/ClubContext";
 import { Matchup } from "@/app/components/Matchup";
 import { PlayerHistoryPanel } from "@/app/components/PlayerHistoryPanel";
 import { SubmitButton } from "@/app/components/SubmitButton";
+import { MATCH_KIND_LABELS, suggestMatchSets, type MatchKind } from "@/lib/magicQueue";
 import type { Game, PlayerSessionWithPlayer } from "@/lib/types";
 
 type SessionOption = { id: string; session_date: string };
@@ -29,164 +30,6 @@ const PICKER_STATUS_STYLES = {
   ongoing: "border-red-200 bg-red-50 text-red-800 hover:border-red-400",
 } as const;
 
-
-/** How many alternative foursomes Suggest cycles through before repeating —
- * a small fixed cap rather than something open-ended, so clicking through
- * every option and coming back around feels intentional, not endless. */
-const SUGGESTION_SET_COUNT = 3;
-
-/**
- * "Magic Queue"-style auto-suggest: picks up to 4 players for this game
- * instead of the queue master choosing every one by hand. Considers the
- * *whole* roster, not just players with nothing else queued right now —
- * games often get queued several deep in advance ("New Game #4" while
- * #1-3 are still queued/ongoing), and by the time a later game's turn
- * comes around, players from those earlier games have already finished.
- * An earlier version only ever suggested from players with zero games
- * queued/ongoing anywhere, so once most of the roster had *something*
- * upcoming, Suggest would quietly run out of candidates and suggest
- * nothing.
- *
- * Weighted by, in priority order: fewest games already queued/ongoing
- * elsewhere (spreads the *upcoming* queue fairly instead of only caring
- * who's free this exact instant), then hasn't played yet / waited longest
- * since their last game, then fewest games played overall as a final
- * tiebreak.
- *
- * Returns up to SUGGESTION_SET_COUNT candidate foursomes (not just one) —
- * the button below cycles through them on repeated clicks, so a queue
- * master who doesn't love the first pick has a couple of reasonable
- * alternatives one tap away instead of nothing. Set 1 is the sliding
- * window `ranked[0:4]` (the single best pick, same as this function used
- * to return on its own), set 2 is `ranked[1:5]`, set 3 is `ranked[2:6]` —
- * each shifts the window one player further down the fairness ranking, so
- * later sets stay close to "who deserves it most" rather than turning into
- * a random shuffle. Windows collapse toward the end of a small roster
- * (nowhere left to shift), so a session without enough players for 3
- * genuinely different groups just returns fewer — cycling then wraps
- * across whatever's actually distinct instead of repeating an identical
- * set under a different click.
- *
- * Two anti-repeat passes sit on top of the ranking, applied to every
- * window: each skips anyone currently mid-game on any court (not just the
- * most recently numbered one), and if a window's foursome still turns out
- * to be the exact same 4 people as another already-queued or ongoing game
- * (just re-paired), it swaps one of them out for the next-best alternative
- * so it doesn't suggest a game that's already effectively on the board.
- * Both fall back to allowing the repeat rather than suggesting fewer than
- * 4 players, for a small enough roster that avoiding it isn't possible.
- * Pure function so it's easy to reason about independent of the
- * component's render.
- */
-function suggestMatchSets(
-  players: PlayerSessionWithPlayer[],
-  games: GameForStatus[],
-  gameId: string | undefined
-): string[][] {
-  if (players.length === 0) return [];
-
-  const maxGameNumber = games.reduce((max, g) => Math.max(max, g.game_number), 0);
-
-  // How many OTHER games (Queued or Ongoing, excluding this one) a player
-  // is already lined up for. 0 means genuinely free right now, but 1 or 2
-  // just means "already has something coming up" — not "unavailable" —
-  // which is what lets Suggest keep working once most of the roster
-  // already has a game queued.
-  function upcomingCount(ps: PlayerSessionWithPlayer): number {
-    let count = 0;
-    for (const g of games) {
-      if (g.id === gameId || g.status === "Done") continue;
-      if ([g.player1_id, g.player2_id, g.player3_id, g.player4_id].includes(ps.player.id)) count++;
-    }
-    return count;
-  }
-
-  function waitScore(ps: PlayerSessionWithPlayer): number {
-    const played = games.filter(
-      (g) =>
-        g.status !== "Queued" &&
-        [g.player1_id, g.player2_id, g.player3_id, g.player4_id].includes(ps.player.id)
-    );
-    // Hasn't played at all yet this session — top priority, ahead of
-    // anyone who has, no matter how long ago their last game was.
-    if (played.length === 0) return Number.POSITIVE_INFINITY;
-    const lastPlayed = Math.max(...played.map((g) => g.game_number));
-    return maxGameNumber - lastPlayed;
-  }
-
-  const ranked = players
-    .map((ps) => ({ ps, upcoming: upcomingCount(ps), wait: waitScore(ps) }))
-    .sort((a, b) => {
-      if (a.upcoming !== b.upcoming) return a.upcoming - b.upcoming;
-      if (a.wait !== b.wait) return b.wait - a.wait;
-      return a.ps.total_games - b.ps.total_games;
-    })
-    .map(({ ps }) => ps.player.id);
-
-  // Everyone currently on a court right now, across every Ongoing game —
-  // not just whichever one happens to have the highest game number.
-  const currentlyOnCourt = new Set(
-    games
-      .filter((g) => g.status === "Ongoing")
-      .flatMap((g) => [g.player1_id, g.player2_id, g.player3_id, g.player4_id])
-      .filter((id): id is string => Boolean(id))
-  );
-
-  // The pool every window draws from, in priority order. If excluding
-  // on-court players leaves fewer than 4 to work with, fall back to the
-  // full ranked list (include them) rather than being unable to fill a
-  // single window at all.
-  const free = ranked.filter((id) => !currentlyOnCourt.has(id));
-  const pool = free.length >= 4 ? free : ranked;
-
-  // Order-independent "who's in this game" fingerprint for every other
-  // active (not Done, not this game) game — so re-pairing the exact same
-  // 4 people differently still counts as suggesting a game that's already
-  // on the board.
-  function rosterSignature(ids: (string | null)[]): string {
-    return ids
-      .filter((id): id is string => Boolean(id))
-      .sort()
-      .join("|");
-  }
-  const activeRosterSignatures = new Set(
-    games
-      .filter((g) => g.id !== gameId && g.status !== "Done")
-      .map((g) => rosterSignature([g.player1_id, g.player2_id, g.player3_id, g.player4_id]))
-  );
-
-  const lastWindowStart = Math.max(0, pool.length - 4);
-  const sets: string[][] = [];
-  const seenSignatures = new Set<string>();
-
-  for (let windowStart = 0; windowStart <= lastWindowStart && sets.length < SUGGESTION_SET_COUNT; windowStart++) {
-    let candidate = pool.slice(windowStart, windowStart + 4);
-    if (candidate.length < 4) break; // fewer than 4 people registered at all
-
-    if (activeRosterSignatures.has(rosterSignature(candidate))) {
-      for (const id of pool) {
-        if (candidate.includes(id)) continue;
-        const swapped = [...candidate.slice(0, 3), id];
-        if (!activeRosterSignatures.has(rosterSignature(swapped))) {
-          candidate = swapped;
-          break;
-        }
-      }
-    }
-
-    const signature = rosterSignature(candidate);
-    if (!seenSignatures.has(signature)) {
-      seenSignatures.add(signature);
-      sets.push(candidate);
-    }
-
-    // The window's already pinned to the last 4 players in the pool —
-    // sliding it further would just repeat the exact same group.
-    if (windowStart === lastWindowStart) break;
-  }
-
-  return sets;
-}
 
 /**
  * Shared body for the New Game and Edit Game forms. Kept as its own
@@ -285,6 +128,11 @@ export function GameFormFields({
   // on every fresh mount (a new New Game/Edit Game open), so the very
   // first click always leads with the single best-ranked suggestion.
   const [suggestionRound, setSuggestionRound] = useState(0);
+  // The format of the foursome Suggest last applied (men's / women's /
+  // mixed / open), shown as a small label next to the button. Cleared as
+  // soon as the queue master changes the pick by hand, since it may no
+  // longer be that format.
+  const [suggestedKind, setSuggestedKind] = useState<MatchKind | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [isDeleting, startDeleteTransition] = useTransition();
 
@@ -350,6 +198,7 @@ export function GameFormFields({
   const nameById = useMemo(() => new Map(players.map((ps) => [ps.player.id, ps.player.name])), [players]);
 
   function toggle(playerId: string) {
+    setSuggestedKind(null);
     setSelected((prev) => {
       const idx = prev.indexOf(playerId);
       if (idx !== -1) {
@@ -494,20 +343,24 @@ export function GameFormFields({
           <span className="flex items-center gap-2">
             <button
               type="button"
-              title="Auto-pick 4 players — weighted by fewest games already queued, then who's waited longest. Click again for another option."
+              title="Auto-pick 4 players as men's, women's or mixed doubles — weighted by fewest games already queued, then who's waited longest. Click again for another option."
               onClick={() => {
                 const sets = suggestMatchSets(players, games, gameId);
                 if (sets.length === 0) return;
                 const picked = sets[suggestionRound % sets.length];
-                const padded: (string | null)[] = [...picked];
-                while (padded.length < 4) padded.push(null);
-                setSelected(padded.slice(0, 4));
+                setSelected([...picked.playerIds]);
+                setSuggestedKind(picked.kind);
                 setSuggestionRound((round) => round + 1);
               }}
               className="rounded-full border border-brand/30 px-2 py-0.5 text-[11px] font-medium text-brand transition-colors hover:bg-brand-light"
             >
               ✨ Suggest
             </button>
+            {suggestedKind && (
+              <span className="rounded-full bg-brand-light px-2 py-0.5 text-[11px] font-medium text-brand">
+                {MATCH_KIND_LABELS[suggestedKind]}
+              </span>
+            )}
             <span className="font-normal text-black/40">{filledCount}/4</span>
           </span>
         </legend>
